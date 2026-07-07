@@ -35,7 +35,8 @@ fun HomeScreen(
     onNavigateToHistory: () -> Unit,
     onNavigateToFeedback: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToDictionary: () -> Unit
+    onNavigateToDictionary: () -> Unit,
+    onNavigateToGrammar: () -> Unit
 ) {
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
 
@@ -167,6 +168,15 @@ fun HomeScreen(
                         icon = Icons.Default.MenuBook,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         onClick = onNavigateToDictionary
+                    )
+                }
+                item {
+                    DashboardCard(
+                        title = "Grammar & Polish",
+                        description = "Fix and rewrite text",
+                        icon = Icons.Default.AutoFixHigh,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        onClick = onNavigateToGrammar
                     )
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {

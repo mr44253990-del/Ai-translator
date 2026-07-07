@@ -68,7 +68,8 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToHistory = { navController.navigate(HistoryRoute) },
                                 onNavigateToFeedback = { navController.navigate(FeedbackRoute) },
                                 onNavigateToSettings = { navController.navigate(SettingsRoute) },
-                                onNavigateToDictionary = { navController.navigate(DictionaryRoute) }
+                                onNavigateToDictionary = { navController.navigate(DictionaryRoute) },
+                                onNavigateToGrammar = { navController.navigate(GrammarRoute) }
                             )
                         }
                         composable<TtsRoute> {
@@ -94,6 +95,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<DictionaryRoute> {
                             DictionaryScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                        }
+                        composable<GrammarRoute> {
+                            GrammarScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                         }
                     }
                 }

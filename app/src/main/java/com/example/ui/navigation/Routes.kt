@@ -34,3 +34,6 @@ object FeedbackRoute
 
 @Serializable
 object DictionaryRoute
+
+@Serializable
+object GrammarRoute

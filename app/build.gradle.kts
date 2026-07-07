@@ -21,6 +21,7 @@ android {
     versionCode = 1
     versionName = "1.0"
     ndk {
+      abiFilters.clear()
       abiFilters.add("arm64-v8a")
     }
 

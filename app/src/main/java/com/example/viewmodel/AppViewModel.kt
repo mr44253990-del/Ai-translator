@@ -29,6 +29,13 @@ import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import java.util.Locale
 
+sealed class GrammarState {
+    object Idle : GrammarState()
+    object Loading : GrammarState()
+    data class Success(val result: String) : GrammarState()
+    data class Error(val message: String) : GrammarState()
+}
+
 class AppViewModel(application: Application) : AndroidViewModel(application), TextToSpeech.OnInitListener {
 
     private val db = DatabaseProvider.getDatabase(application)
@@ -88,6 +95,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     private val _dictionaryState = MutableStateFlow<DictionaryState>(DictionaryState.Idle)
     val dictionaryState = _dictionaryState.asStateFlow()
 
+    // Grammar State
+    private val _grammarState = MutableStateFlow<GrammarState>(GrammarState.Idle)
+    val grammarState = _grammarState.asStateFlow()
+
     // Connectivity State
     private val networkMonitor = NetworkMonitor(application)
     val isOnline = networkMonitor.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -98,6 +109,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
 
     val mistralApiKey = settingsManager.mistralApiKeyFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuildConfig.MISTRAL_API_KEY)
+
+    val mistralModel = settingsManager.mistralModelFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "mistral-small-latest")
+
+    val geminiApiKey = settingsManager.geminiApiKeyFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuildConfig.GEMINI_API_KEY)
+
+    val geminiModel = settingsManager.geminiModelFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-1.5-flash")
 
     fun setAiModel(model: String) {
         viewModelScope.launch {
@@ -111,11 +131,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
         }
     }
 
-    private val geminiModel by lazy {
-        GenerativeModel(
-            modelName = "gemini-1.5-flash",
-            apiKey = BuildConfig.GEMINI_API_KEY
-        )
+    fun setMistralModel(model: String) {
+        viewModelScope.launch {
+            settingsManager.saveMistralModel(model)
+        }
+    }
+
+    fun setGeminiApiKey(apiKey: String) {
+        viewModelScope.launch {
+            settingsManager.saveGeminiApiKey(apiKey)
+        }
+    }
+
+    fun setGeminiModel(model: String) {
+        viewModelScope.launch {
+            settingsManager.saveGeminiModel(model)
+        }
     }
 
     private var mistralService: MistralService? = null
@@ -287,14 +318,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     }
 
     private suspend fun getAiResponse(prompt: String): String {
-        val model = aiModel.value
-        return if (model == "mistral") {
+        val provider = aiModel.value
+        return if (provider == "mistral") {
+            // Check if key changed or service is null
             if (mistralService == null) {
                 mistralService = MistralService(mistralApiKey.value)
             }
-            mistralService?.generateContent("mistral-tiny", prompt) ?: "Mistral AI error"
+            mistralService?.generateContent(mistralModel.value, prompt) ?: "Mistral AI error"
         } else {
-            val response = geminiModel.generateContent(prompt)
+            val genModel = GenerativeModel(
+                modelName = geminiModel.value,
+                apiKey = geminiApiKey.value
+            )
+            val response = genModel.generateContent(prompt)
             response.text ?: "Gemini AI error"
         }
     }
@@ -372,6 +408,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
                 }
             } catch (e: Exception) {
                 _dictionaryState.value = DictionaryState.Error(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    // --- Grammar Checker (Online AI Only) ---
+    fun generateGrammarFix(text: String, tone: String) {
+        viewModelScope.launch {
+            _grammarState.value = GrammarState.Loading
+            try {
+                if (text.isBlank()) {
+                    _grammarState.value = GrammarState.Success("No content.")
+                    return@launch
+                }
+
+                if (isOnline.value) {
+                    val prompt = """
+                        Review the following text for grammatical errors.
+                        Rewrite it to be "$tone".
+                        Show the original text, the rewritten text, and briefly explain the changes made.
+                        
+                        Text: "$text"
+                    """.trimIndent()
+                    val result = getAiResponse(prompt)
+                    _grammarState.value = GrammarState.Success(result)
+                    saveHistory("GRAMMAR_ONLINE", text, result)
+                } else {
+                    _grammarState.value = GrammarState.Error("Internet connection required for advanced grammar analysis.")
+                }
+            } catch (e: Exception) {
+                _grammarState.value = GrammarState.Error(e.localizedMessage ?: "Unknown error")
             }
         }
     }

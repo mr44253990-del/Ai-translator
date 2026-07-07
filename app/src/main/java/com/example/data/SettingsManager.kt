@@ -22,6 +22,9 @@ class SettingsManager(private val context: Context) {
         val APP_THEME = stringPreferencesKey("app_theme")
         val AI_MODEL = stringPreferencesKey("ai_model")
         val MISTRAL_API_KEY = stringPreferencesKey("mistral_api_key")
+        val MISTRAL_MODEL = stringPreferencesKey("mistral_model")
+        val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        val GEMINI_MODEL = stringPreferencesKey("gemini_model")
     }
 
     val aiModelFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -30,6 +33,18 @@ class SettingsManager(private val context: Context) {
 
     val mistralApiKeyFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[MISTRAL_API_KEY] ?: com.example.BuildConfig.MISTRAL_API_KEY
+    }
+
+    val mistralModelFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[MISTRAL_MODEL] ?: "mistral-small-latest"
+    }
+
+    val geminiApiKeyFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[GEMINI_API_KEY] ?: com.example.BuildConfig.GEMINI_API_KEY
+    }
+
+    val geminiModelFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[GEMINI_MODEL] ?: "gemini-1.5-flash"
     }
 
     suspend fun saveAiModel(model: String) {
@@ -41,6 +56,24 @@ class SettingsManager(private val context: Context) {
     suspend fun saveMistralApiKey(apiKey: String) {
         context.dataStore.edit { preferences ->
             preferences[MISTRAL_API_KEY] = apiKey
+        }
+    }
+
+    suspend fun saveMistralModel(model: String) {
+        context.dataStore.edit { preferences ->
+            preferences[MISTRAL_MODEL] = model
+        }
+    }
+
+    suspend fun saveGeminiApiKey(apiKey: String) {
+        context.dataStore.edit { preferences ->
+            preferences[GEMINI_API_KEY] = apiKey
+        }
+    }
+
+    suspend fun saveGeminiModel(model: String) {
+        context.dataStore.edit { preferences ->
+            preferences[GEMINI_MODEL] = model
         }
     }
 

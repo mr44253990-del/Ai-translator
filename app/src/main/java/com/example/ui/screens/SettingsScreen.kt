@@ -231,8 +231,16 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
             val currentAiModel by viewModel.aiModel.collectAsStateWithLifecycle()
             val mistralKey by viewModel.mistralApiKey.collectAsStateWithLifecycle()
+            val geminiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
+            val selectedMistral by viewModel.mistralModel.collectAsStateWithLifecycle()
+            val selectedGemini by viewModel.geminiModel.collectAsStateWithLifecycle()
+
             var mistralKeyInput by remember { mutableStateOf(mistralKey) }
+            var geminiKeyInput by remember { mutableStateOf(geminiKey) }
             var isVerifying by remember { mutableStateOf(false) }
+
+            val mistralOptions = listOf("mistral-tiny", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest", "open-mixtral-8x7b", "open-mixtral-8x22b")
+            val geminiOptions = listOf("gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro", "gemini-2.0-flash", "gemma-2-2b-it", "gemma-2-9b-it", "gemma-2-27b-it")
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -267,7 +275,50 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         )
                     }
 
+                    if (currentAiModel == "gemini") {
+                        ModelDropdownMenu(
+                            options = geminiOptions,
+                            selectedOption = selectedGemini,
+                            onOptionSelected = { viewModel.setGeminiModel(it) },
+                            label = "Select Gemini Model"
+                        )
+                        
+                        OutlinedTextField(
+                            value = geminiKeyInput,
+                            onValueChange = { geminiKeyInput = it },
+                            label = { Text("Gemini API Key") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                        )
+                        
+                        Button(
+                            onClick = {
+                                isVerifying = true
+                                viewModel.setGeminiApiKey(geminiKeyInput)
+                                isVerifying = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = geminiKeyInput.isNotBlank() && !isVerifying
+                        ) {
+                            if (isVerifying) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                            } else {
+                                Icon(Icons.Default.VerifiedUser, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Save Gemini Config")
+                            }
+                        }
+                    }
+
                     if (currentAiModel == "mistral") {
+                        ModelDropdownMenu(
+                            options = mistralOptions,
+                            selectedOption = selectedMistral,
+                            onOptionSelected = { viewModel.setMistralModel(it) },
+                            label = "Select Mistral Model"
+                        )
+
                         OutlinedTextField(
                             value = mistralKeyInput,
                             onValueChange = { mistralKeyInput = it },
@@ -280,9 +331,7 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         Button(
                             onClick = {
                                 isVerifying = true
-                                // Verification logic (simulated for now, or just save)
                                 viewModel.setMistralApiKey(mistralKeyInput)
-                                // In a real app, we'd call a test API endpoint here.
                                 isVerifying = false
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -293,7 +342,7 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             } else {
                                 Icon(Icons.Default.VerifiedUser, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Save & Verify API Key")
+                                Text("Save Mistral Config")
                             }
                         }
                     }
@@ -415,6 +464,50 @@ fun ThemeOptionCard(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModelDropdownMenu(
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    label: String
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedOption,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { selectionOption ->
+                DropdownMenuItem(
+                    text = { Text(selectionOption) },
+                    onClick = {
+                        onOptionSelected(selectionOption)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
