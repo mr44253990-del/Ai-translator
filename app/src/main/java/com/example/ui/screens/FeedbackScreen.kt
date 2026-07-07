@@ -17,10 +17,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.viewmodel.AppViewModel
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var feedbackType by remember { mutableStateOf("Feature Request") }
@@ -33,7 +38,7 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Submit Feedback", fontWeight = FontWeight.Bold) },
+                title = { Text("Report & Feedback", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -64,14 +69,14 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Thank You!",
+                        text = "Report Sent!",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Your feedback has been saved locally and helps improve offline translations.",
+                        text = "Your feedback has been prepared for sending. Opening your email app now...",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -89,16 +94,27 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        "We would love to hear from you. Tell us how to improve your translation experience.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
-                    )
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "Submit a Report",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Found a bug or have a suggestion? Your report helps us make Rakib AI Translator better.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
 
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Name") },
+                        label = { Text("Your Name") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -106,9 +122,10 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("Email Address") },
+                        label = { Text("Your Email Address") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        placeholder = { Text("example@email.com") }
                     )
 
                     ExposedDropdownMenuBox(
@@ -119,7 +136,7 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             value = feedbackType,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Feedback Type") },
+                            label = { Text("Category") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -144,15 +161,39 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     OutlinedTextField(
                         value = message,
                         onValueChange = { message = it },
-                        label = { Text("Message / Description") },
+                        label = { Text("Detailed Report / Complaint") },
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 4
+                        minLines = 6
                     )
 
                     Button(
                         onClick = {
-                            viewModel.saveHistory("FEEDBACK", "Type: $feedbackType | By: $name", message)
-                            isSubmitted = true
+                            val finalMessage = """
+                                Name: $name
+                                Email: $email
+                                Category: $feedbackType
+                                
+                                Message:
+                                $message
+                                
+                                Best Regards,
+                                রাকিবুল
+                            """.trimIndent()
+                            
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:")
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf("mr4425390@gmail.com"))
+                                putExtra(Intent.EXTRA_SUBJECT, "App Report: $feedbackType (from Rakib AI)")
+                                putExtra(Intent.EXTRA_TEXT, finalMessage)
+                            }
+                            
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "Send Email"))
+                                viewModel.saveHistory("REPORT", feedbackType, message)
+                                isSubmitted = true
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "No email app found", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -163,7 +204,7 @@ fun FeedbackScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     ) {
                         Icon(Icons.Default.Send, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Submit Feedback", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        Text("Send Report", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                     }
                 }
             }

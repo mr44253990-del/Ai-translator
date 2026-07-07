@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,79 +52,152 @@ fun SplashScreen(onNavigateToHome: () -> Unit) {
         label = "offset"
     )
 
+    // Floating animation for the logo box
+    val floatAnim by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float"
+    )
+
+    // Pulse effect for the background glow
+    val pulseAnim by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = EaseInOutBack),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     LaunchedEffect(key1 = true) {
         startAnimation = true
-        delay(2500)
+        delay(3000)
         onNavigateToHome()
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary,
-                        MaterialTheme.colorScheme.tertiary
-                    ),
-                    start = androidx.compose.ui.geometry.Offset(animatedOffset, 0f),
-                    end = androidx.compose.ui.geometry.Offset(0f, animatedOffset)
-                )
-            ),
+            .background(Color(0xFF0F172A)), // Dark slate background
         contentAlignment = Alignment.Center
     ) {
+        // Dynamic Glowing Background
+        Box(
+            modifier = Modifier
+                .size(400.dp)
+                .alpha(0.15f * pulseAnim)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .alpha(alphaAnim)
                 .scale(scaleAnim)
+                .offset(y = floatAnim.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Translate,
-                    contentDescription = "App Logo",
-                    modifier = Modifier.size(140.dp),
-                    tint = Color.White
-                )
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .align(Alignment.TopEnd)
-                        .offset(x = 10.dp, y = (-10).dp),
-                    tint = Color.White.copy(alpha = 0.8f)
-                )
+            // Elegant Dynamic Box for the Logo
+            Surface(
+                modifier = Modifier
+                    .size(180.dp)
+                    .padding(8.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White.copy(alpha = 0.05f),
+                border = androidx.compose.foundation.BorderStroke(
+                    2.dp, 
+                    Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                    )
+                ),
+                shadowElevation = 8.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(100.dp),
+                        tint = Color.White
+                    )
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp),
+                        tint = Color.Yellow.copy(alpha = 0.8f)
+                    )
+                }
             }
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Text(
                 text = "Rakib AI Translator",
                 color = Color.White,
-                fontSize = 28.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.sp
+                letterSpacing = 2.sp,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        offset = androidx.compose.ui.geometry.Offset(2f, 4f),
+                        blurRadius = 8f
+                    )
+                )
             )
             
-            Text(
-                text = "Smart NLP & Hybrid Intelligence",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "Smart NLP & Hybrid Intelligence",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
         }
         
-        // Bottom "Powered by" text
-        Text(
-            text = "Powered by Mistral AI",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 12.sp,
+        // Bottom Branding Section
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp),
-            fontWeight = FontWeight.Light
-        )
+                .padding(bottom = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Powered by Mistral AI",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.White.copy(alpha = 0.1f)
+            )
+        }
     }
 }

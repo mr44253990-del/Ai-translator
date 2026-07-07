@@ -1,6 +1,6 @@
 {
-  "name": "Offline Translator AI",
-  "description": "Offline translator, Text to Speech, OCR and AI text summarizer.",
+  "name": "Rakib AI Translator",
+  "description": "Smart NLP AI Translator with TTS, OCR, Dictionary and Grammar check.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
