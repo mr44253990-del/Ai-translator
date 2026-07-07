@@ -62,31 +62,31 @@ class MainActivity : ComponentActivity() {
                         composable<HomeRoute> {
                             HomeScreen(
                                 viewModel = viewModel,
-                                onNavigateToTts = { navController.navigate(TtsRoute) },
-                                onNavigateToOcr = { navController.navigate(OcrRoute) },
-                                onNavigateToTranslate = { navController.navigate(TranslatorRoute) },
-                                onNavigateToAi = { navController.navigate(AiSummarizerRoute) },
+                                onNavigateToTts = { navController.navigate(TtsRoute()) },
+                                onNavigateToOcr = { navController.navigate(OcrRoute()) },
+                                onNavigateToTranslate = { navController.navigate(TranslatorRoute()) },
+                                onNavigateToAi = { navController.navigate(AiSummarizerRoute()) },
                                 onNavigateToHistory = { navController.navigate(HistoryRoute) },
                                 onNavigateToFeedback = { navController.navigate(FeedbackRoute) },
                                 onNavigateToSettings = { navController.navigate(SettingsRoute) },
-                                onNavigateToDictionary = { navController.navigate(DictionaryRoute) },
-                                onNavigateToGrammar = { navController.navigate(GrammarRoute) }
+                                onNavigateToDictionary = { navController.navigate(DictionaryRoute()) },
+                                onNavigateToGrammar = { navController.navigate(GrammarRoute()) }
                             )
                         }
                         composable<TtsRoute> { backStackEntry ->
-                            val route: TtsRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<TtsRoute>()
                             TtsScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                         composable<OcrRoute> { backStackEntry ->
-                            val route: OcrRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<OcrRoute>()
                             OcrScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                         composable<TranslatorRoute> { backStackEntry ->
-                            val route: TranslatorRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<TranslatorRoute>()
                             TranslatorScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                         composable<AiSummarizerRoute> { backStackEntry ->
-                            val route: AiSummarizerRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<AiSummarizerRoute>()
                             AiSummarizerScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                         composable<HistoryRoute> {
@@ -114,11 +114,11 @@ class MainActivity : ComponentActivity() {
                             FeedbackScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                         }
                         composable<DictionaryRoute> { backStackEntry ->
-                            val route: DictionaryRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<DictionaryRoute>()
                             DictionaryScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                         composable<GrammarRoute> { backStackEntry ->
-                            val route: GrammarRoute = backStackEntry.toRoute()
+                            val route = backStackEntry.toRoute<GrammarRoute>()
                             GrammarScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
                         }
                     }
