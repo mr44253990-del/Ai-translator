@@ -31,3 +31,6 @@ object HistoryRoute
 
 @Serializable
 object FeedbackRoute
+
+@Serializable
+object DictionaryRoute

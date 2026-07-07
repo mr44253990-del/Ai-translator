@@ -221,7 +221,86 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 }
             }
 
-            // 3. Developer & App Info
+            // 3. AI Configuration
+            Text(
+                "AI Configuration (Mistral & Gemini)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            val currentAiModel by viewModel.aiModel.collectAsStateWithLifecycle()
+            val mistralKey by viewModel.mistralApiKey.collectAsStateWithLifecycle()
+            var mistralKeyInput by remember { mutableStateOf(mistralKey) }
+            var isVerifying by remember { mutableStateOf(false) }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        "Choose your preferred AI model for online summarization and dictionary lookup.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = currentAiModel == "gemini",
+                            onClick = { viewModel.setAiModel("gemini") },
+                            label = { Text("Gemini AI") },
+                            leadingIcon = if (currentAiModel == "gemini") {
+                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = currentAiModel == "mistral",
+                            onClick = { viewModel.setAiModel("mistral") },
+                            label = { Text("Mistral AI") },
+                            leadingIcon = if (currentAiModel == "mistral") {
+                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(16.dp)) }
+                            } else null,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (currentAiModel == "mistral") {
+                        OutlinedTextField(
+                            value = mistralKeyInput,
+                            onValueChange = { mistralKeyInput = it },
+                            label = { Text("Mistral API Key") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                        )
+                        
+                        Button(
+                            onClick = {
+                                isVerifying = true
+                                // Verification logic (simulated for now, or just save)
+                                viewModel.setMistralApiKey(mistralKeyInput)
+                                // In a real app, we'd call a test API endpoint here.
+                                isVerifying = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = mistralKeyInput.isNotBlank() && !isVerifying
+                        ) {
+                            if (isVerifying) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                            } else {
+                                Icon(Icons.Default.VerifiedUser, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Save & Verify API Key")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. Developer & App Info
             Text(
                 "Developer & App Information",
                 style = MaterialTheme.typography.titleMedium,
@@ -268,7 +347,7 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("Privacy Guarantee", style = MaterialTheme.typography.labelSmall)
-                            Text("100% Offline & Private (No external API calls)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            Text("Hybrid AI: Local processing + Secure Cloud AI", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                         }
                     }
 

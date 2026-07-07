@@ -20,21 +20,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.viewmodel.AppViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    viewModel: AppViewModel,
     onNavigateToTts: () -> Unit,
     onNavigateToOcr: () -> Unit,
     onNavigateToTranslate: () -> Unit,
     onNavigateToAi: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToFeedback: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDictionary: () -> Unit
 ) {
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Offline AI Translator", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Offline AI Translator", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = if (isOnline) Icons.Default.Wifi else Icons.Default.WifiOff,
+                            contentDescription = null,
+                            tint = if (isOnline) Color(0xFF4CAF50) else Color(0xFFF44336),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -135,10 +154,19 @@ fun HomeScreen(
                 item {
                     DashboardCard(
                         title = "AI Summarizer",
-                        description = "Local on-device AI",
+                        description = "Smart AI Summarizer",
                         icon = Icons.Default.AutoAwesome,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         onClick = onNavigateToAi
+                    )
+                }
+                item {
+                    DashboardCard(
+                        title = "AI Dictionary",
+                        description = "Smart grammar & lookup",
+                        icon = Icons.Default.MenuBook,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        onClick = onNavigateToDictionary
                     )
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {

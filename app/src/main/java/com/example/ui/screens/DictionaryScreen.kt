@@ -9,7 +9,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material3.*
@@ -24,15 +24,13 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.viewmodel.AppViewModel
-import com.example.viewmodel.AiSummaryState
+import com.example.viewmodel.DictionaryState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var textToSummarize by remember { mutableStateOf("") }
-    var targetLanguage by remember { mutableStateOf("Bangla") }
-
-    val aiSummaryState by viewModel.aiSummaryState.collectAsStateWithLifecycle()
+fun DictionaryScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+    var textToLookup by remember { mutableStateOf("") }
+    val dictionaryState by viewModel.dictionaryState.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     val aiModel by viewModel.aiModel.collectAsStateWithLifecycle()
     val clipboardManager = LocalClipboardManager.current
@@ -43,7 +41,7 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Smart AI Summarizer", fontWeight = FontWeight.Bold) },
+                title = { Text("Smart Dictionary", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 }
@@ -86,7 +84,7 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             color = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                         )
                         Text(
-                            if (isOnline) "Using ${aiModel.uppercase()} for deep analysis and summary." else "Using local NLP for basic summary.",
+                            if (isOnline) "Deep AI lookup for meanings, grammar, and synonyms." else "Using local translation for meanings.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -96,66 +94,38 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
             // Text Input Field
             OutlinedTextField(
-                value = textToSummarize,
-                onValueChange = { textToSummarize = it },
-                label = { Text("Enter paragraph or article to summarize") },
+                value = textToLookup,
+                onValueChange = { textToLookup = it },
+                label = { Text("Enter a word or sentence") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 5,
-                maxLines = 10
+                minLines = 2,
+                maxLines = 5
             )
 
-            // Target Language Selector Chips
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Output Summary Language:",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(
-                        selected = targetLanguage == "Bangla",
-                        onClick = { targetLanguage = "Bangla" },
-                        label = { Text("Bangla / বাংলা") },
-                        leadingIcon = if (targetLanguage == "Bangla") {
-                            { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    FilterChip(
-                        selected = targetLanguage == "English",
-                        onClick = { targetLanguage = "English" },
-                        label = { Text("English") },
-                        leadingIcon = if (targetLanguage == "English") {
-                            { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else null
-                    )
-                }
-            }
-
-            // Summarize Action Button
+            // Lookup Action Button
             Button(
-                onClick = { viewModel.generateAiSummary(textToSummarize, targetLanguage) },
+                onClick = { viewModel.generateDictionaryLookup(textToLookup) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = textToSummarize.isNotBlank() && aiSummaryState !is AiSummaryState.Loading
+                enabled = textToLookup.isNotBlank() && dictionaryState !is DictionaryState.Loading
             ) {
-                if (aiSummaryState is AiSummaryState.Loading) {
+                if (dictionaryState is DictionaryState.Loading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Inference Processing...")
+                    Text("Looking up...")
                 } else {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Summarize & Analyze")
+                    Text("Lookup Definition")
                 }
             }
 
             // Results Section
-            when (val state = aiSummaryState) {
-                is AiSummaryState.Success -> {
+            when (val state = dictionaryState) {
+                is DictionaryState.Success -> {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
@@ -167,16 +137,16 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "AI Result:", 
+                                    "Result:", 
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 IconButton(
                                     onClick = {
-                                        clipboardManager.setText(AnnotatedString(state.summary))
+                                        clipboardManager.setText(AnnotatedString(state.result))
                                         scope.launch {
-                                            snackbarHostState.showSnackbar("Summary copied to clipboard")
+                                            snackbarHostState.showSnackbar("Result copied to clipboard")
                                         }
                                     }
                                 ) {
@@ -185,14 +155,14 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = state.summary,
+                                text = state.result,
                                 style = MaterialTheme.typography.bodyLarge,
                                 lineHeight = 24.sp
                             )
                         }
                     }
                 }
-                is AiSummaryState.Error -> {
+                is DictionaryState.Error -> {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                     ) {
@@ -200,7 +170,7 @@ fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             Icon(Icons.Default.Info, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "Summarization Error: ${state.message}",
+                                text = "Error: ${state.message}",
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 style = MaterialTheme.typography.bodyMedium
                             )

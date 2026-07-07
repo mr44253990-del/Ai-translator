@@ -20,6 +20,9 @@ android {
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
+    ndk {
+      abiFilters.add("arm64-v8a")
+    }
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -110,6 +113,11 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.onnxruntime.android)
+  implementation(libs.ktor.client.core)
+  implementation(libs.ktor.client.cio)
+  implementation(libs.ktor.client.content.negotiation)
+  implementation(libs.ktor.serialization.kotlinx.json)
+  implementation(libs.ktor.client.logging)
   implementation(libs.androidx.camera.core)
   implementation(libs.androidx.camera.camera2)
   implementation(libs.androidx.camera.lifecycle)

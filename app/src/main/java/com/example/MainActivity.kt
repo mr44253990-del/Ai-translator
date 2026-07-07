@@ -60,13 +60,15 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<HomeRoute> {
                             HomeScreen(
+                                viewModel = viewModel,
                                 onNavigateToTts = { navController.navigate(TtsRoute) },
                                 onNavigateToOcr = { navController.navigate(OcrRoute) },
                                 onNavigateToTranslate = { navController.navigate(TranslatorRoute) },
                                 onNavigateToAi = { navController.navigate(AiSummarizerRoute) },
                                 onNavigateToHistory = { navController.navigate(HistoryRoute) },
                                 onNavigateToFeedback = { navController.navigate(FeedbackRoute) },
-                                onNavigateToSettings = { navController.navigate(SettingsRoute) }
+                                onNavigateToSettings = { navController.navigate(SettingsRoute) },
+                                onNavigateToDictionary = { navController.navigate(DictionaryRoute) }
                             )
                         }
                         composable<TtsRoute> {
@@ -89,6 +91,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable<FeedbackRoute> {
                             FeedbackScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                        }
+                        composable<DictionaryRoute> {
+                            DictionaryScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                         }
                     }
                 }

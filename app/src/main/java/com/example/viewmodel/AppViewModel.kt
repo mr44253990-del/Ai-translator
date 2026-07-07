@@ -22,6 +22,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import com.example.BuildConfig
+import com.example.data.MistralService
+import com.example.util.NetworkMonitor
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.content
 import java.util.Locale
 
 class AppViewModel(application: Application) : AndroidViewModel(application), TextToSpeech.OnInitListener {
@@ -78,6 +83,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     // AI Summarizer State
     private val _aiSummaryState = MutableStateFlow<AiSummaryState>(AiSummaryState.Idle)
     val aiSummaryState = _aiSummaryState.asStateFlow()
+
+    // Dictionary State
+    private val _dictionaryState = MutableStateFlow<DictionaryState>(DictionaryState.Idle)
+    val dictionaryState = _dictionaryState.asStateFlow()
+
+    // Connectivity State
+    private val networkMonitor = NetworkMonitor(application)
+    val isOnline = networkMonitor.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // AI Settings
+    val aiModel = settingsManager.aiModelFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini")
+
+    val mistralApiKey = settingsManager.mistralApiKeyFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuildConfig.MISTRAL_API_KEY)
+
+    fun setAiModel(model: String) {
+        viewModelScope.launch {
+            settingsManager.saveAiModel(model)
+        }
+    }
+
+    fun setMistralApiKey(apiKey: String) {
+        viewModelScope.launch {
+            settingsManager.saveMistralApiKey(apiKey)
+        }
+    }
+
+    private val geminiModel by lazy {
+        GenerativeModel(
+            modelName = "gemini-1.5-flash",
+            apiKey = BuildConfig.GEMINI_API_KEY
+        )
+    }
+
+    private var mistralService: MistralService? = null
 
     init {
         textToSpeech = TextToSpeech(application, this)
@@ -245,77 +286,92 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
         translateText(text, TranslateLanguage.BENGALI, TranslateLanguage.ENGLISH, onResult)
     }
 
-    // --- Dynamic Offline NLP Summarizer with Translation ---
+    private suspend fun getAiResponse(prompt: String): String {
+        val model = aiModel.value
+        return if (model == "mistral") {
+            if (mistralService == null) {
+                mistralService = MistralService(mistralApiKey.value)
+            }
+            mistralService?.generateContent("mistral-tiny", prompt) ?: "Mistral AI error"
+        } else {
+            val response = geminiModel.generateContent(prompt)
+            response.text ?: "Gemini AI error"
+        }
+    }
+
+    // --- Hybrid NLP Summarizer (Online AI vs Offline Local) ---
     fun generateAiSummary(text: String, targetLanguage: String) {
         viewModelScope.launch {
             _aiSummaryState.value = AiSummaryState.Loading
             try {
-                // Perform local NLP TF-IDF text summarization (completely offline, zero API call/GGUF size)
-                val summary = Text2Summary.summarize(text, compressionFactor = 0.5f)
-                
-                if (summary.isBlank()) {
+                if (text.isBlank()) {
                     _aiSummaryState.value = AiSummaryState.Success("No content to summarize.")
                     return@launch
                 }
 
-                // If target language is Bangla, translate the summary
-                if (targetLanguage == "Bangla") {
-                    // Identify text language first
-                    val languageIdentifier = com.google.mlkit.nl.languageid.LanguageIdentification.getClient()
-                    languageIdentifier.identifyLanguage(summary)
-                        .addOnSuccessListener { identifiedCode ->
-                            val sourceCode = if (identifiedCode == "und" || identifiedCode == "bn") {
-                                TranslateLanguage.ENGLISH // fallback
-                            } else {
-                                identifiedCode
-                            }
-                            
-                            if (sourceCode == TranslateLanguage.BENGALI) {
-                                _aiSummaryState.value = AiSummaryState.Success(summary)
-                                saveHistory("AI_SUMMARY", text, summary)
-                            } else {
-                                translateText(summary, sourceCode, TranslateLanguage.BENGALI) { translatedSummary ->
-                                    _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
-                                    saveHistory("AI_SUMMARY", text, translatedSummary)
-                                }
-                            }
-                        }
-                        .addOnFailureListener {
-                            translateText(summary, TranslateLanguage.ENGLISH, TranslateLanguage.BENGALI) { translatedSummary ->
-                                _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
-                                saveHistory("AI_SUMMARY", text, translatedSummary)
-                            }
-                        }
+                if (isOnline.value) {
+                    val prompt = "Please summarize the following text completely. Also analyze grammar (tenses, pronouns). Return the result in $targetLanguage.\n\nText: $text"
+                    val result = getAiResponse(prompt)
+                    _aiSummaryState.value = AiSummaryState.Success(result)
+                    saveHistory("AI_SUMMARY_ONLINE", text, result)
                 } else {
-                    // Target language is English
-                    val languageIdentifier = com.google.mlkit.nl.languageid.LanguageIdentification.getClient()
-                    languageIdentifier.identifyLanguage(summary)
-                        .addOnSuccessListener { identifiedCode ->
-                            val sourceCode = if (identifiedCode == "und") {
-                                TranslateLanguage.BENGALI // fallback
-                            } else {
-                                identifiedCode
-                            }
-                            
-                            if (sourceCode == TranslateLanguage.ENGLISH) {
-                                _aiSummaryState.value = AiSummaryState.Success(summary)
-                                saveHistory("AI_SUMMARY", text, summary)
-                            } else {
-                                translateText(summary, sourceCode, TranslateLanguage.ENGLISH) { translatedSummary ->
-                                    _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
-                                    saveHistory("AI_SUMMARY", text, translatedSummary)
-                                }
-                            }
+                    // Offline local summarizer
+                    val summary = Text2Summary.summarize(text, compressionFactor = 0.5f)
+                    if (targetLanguage == "Bangla") {
+                        translateText(summary, TranslateLanguage.ENGLISH, TranslateLanguage.BENGALI) { translated ->
+                            val finalResult = "[Offline Mode]\nSummary: $translated\n\nNote: Grammatical analysis requires internet."
+                            _aiSummaryState.value = AiSummaryState.Success(finalResult)
+                            saveHistory("AI_SUMMARY_OFFLINE", text, finalResult)
                         }
-                        .addOnFailureListener {
-                            translateText(summary, TranslateLanguage.BENGALI, TranslateLanguage.ENGLISH) { translatedSummary ->
-                                _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
-                                saveHistory("AI_SUMMARY", text, translatedSummary)
-                            }
-                        }
+                    } else {
+                        val finalResult = "[Offline Mode]\nSummary: $summary\n\nNote: Grammatical analysis requires internet."
+                        _aiSummaryState.value = AiSummaryState.Success(finalResult)
+                        saveHistory("AI_SUMMARY_OFFLINE", text, finalResult)
+                    }
                 }
             } catch (e: Exception) {
-                _aiSummaryState.value = AiSummaryState.Error(e.message ?: "Unknown error")
+                _aiSummaryState.value = AiSummaryState.Error(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+    
+    // --- Hybrid Dictionary Lookup (Online AI vs Offline Local) ---
+    fun generateDictionaryLookup(wordOrSentence: String) {
+        viewModelScope.launch {
+            _dictionaryState.value = DictionaryState.Loading
+            try {
+                if (wordOrSentence.isBlank()) {
+                    _dictionaryState.value = DictionaryState.Success("No content.")
+                    return@launch
+                }
+
+                if (isOnline.value) {
+                    val prompt = """
+                        Act as an advanced dictionary. Analyze: "$wordOrSentence"
+                        1. Parts of speech (verb, noun, pronoun, etc.)
+                        2. Tense (Past, Present, Future).
+                        3. Bengali & English meanings.
+                        4. Synonyms.
+                        Return result clearly in Bengali (with English terms in brackets).
+                    """.trimIndent()
+                    val result = getAiResponse(prompt)
+                    _dictionaryState.value = DictionaryState.Success(result)
+                    saveHistory("DICTIONARY_ONLINE", wordOrSentence, result)
+                } else {
+                    // Offline: just translation
+                    translateText(wordOrSentence, TranslateLanguage.ENGLISH, TranslateLanguage.BENGALI) { translatedEnToBn ->
+                        translateText(wordOrSentence, TranslateLanguage.BENGALI, TranslateLanguage.ENGLISH) { translatedBnToEn ->
+                            val finalResult = "[Offline Mode]\n" +
+                                "English to Bangla: $translatedEnToBn\n" +
+                                "Bangla to English: $translatedBnToEn\n\n" +
+                                "Note: Advanced grammar analysis requires internet."
+                            _dictionaryState.value = DictionaryState.Success(finalResult)
+                            saveHistory("DICTIONARY_OFFLINE", wordOrSentence, finalResult)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _dictionaryState.value = DictionaryState.Error(e.localizedMessage ?: "Unknown error")
             }
         }
     }
@@ -397,4 +453,11 @@ sealed class AiSummaryState {
     object Loading : AiSummaryState()
     data class Success(val summary: String) : AiSummaryState()
     data class Error(val message: String) : AiSummaryState()
+}
+
+sealed class DictionaryState {
+    object Idle : DictionaryState()
+    object Loading : DictionaryState()
+    data class Success(val result: String) : DictionaryState()
+    data class Error(val message: String) : DictionaryState()
 }

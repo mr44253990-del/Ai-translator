@@ -20,6 +20,28 @@ class SettingsManager(private val context: Context) {
         val TTS_VOICE = stringPreferencesKey("tts_voice")
         val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
         val APP_THEME = stringPreferencesKey("app_theme")
+        val AI_MODEL = stringPreferencesKey("ai_model")
+        val MISTRAL_API_KEY = stringPreferencesKey("mistral_api_key")
+    }
+
+    val aiModelFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[AI_MODEL] ?: "gemini"
+    }
+
+    val mistralApiKeyFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[MISTRAL_API_KEY] ?: com.example.BuildConfig.MISTRAL_API_KEY
+    }
+
+    suspend fun saveAiModel(model: String) {
+        context.dataStore.edit { preferences ->
+            preferences[AI_MODEL] = model
+        }
+    }
+
+    suspend fun saveMistralApiKey(apiKey: String) {
+        context.dataStore.edit { preferences ->
+            preferences[MISTRAL_API_KEY] = apiKey
+        }
     }
 
     val ttsSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
