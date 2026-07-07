@@ -27,8 +27,15 @@ import com.example.viewmodel.GrammarState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GrammarScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var textToReview by remember { mutableStateOf("") }
+fun GrammarScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
+    var textToReview by remember { mutableStateOf(initialText ?: "") }
+    
+    // Auto-trigger if initialText is provided
+    LaunchedEffect(initialText) {
+        if (initialText != null) {
+            viewModel.generateGrammarFix(initialText, "Professional")
+        }
+    }
     var selectedTone by remember { mutableStateOf("Professional") }
     
     val grammarState by viewModel.grammarState.collectAsStateWithLifecycle()

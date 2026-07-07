@@ -25,13 +25,22 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TranslatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var textToTranslate by remember { mutableStateOf("") }
+fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
+    var textToTranslate by remember { mutableStateOf(initialText ?: "") }
     var translatedText by remember { mutableStateOf("") }
     
     // Default translation pair: English to Bengali
     var sourceLang by remember { mutableStateOf(TranslateLanguage.ENGLISH) }
     var targetLang by remember { mutableStateOf(TranslateLanguage.BENGALI) }
+
+    // Auto-trigger translation if initialText is provided
+    LaunchedEffect(initialText) {
+        if (initialText != null) {
+            viewModel.translateText(initialText, sourceLang, targetLang) {
+                translatedText = it
+            }
+        }
+    }
 
     val downloadedModels by viewModel.downloadedModels.collectAsStateWithLifecycle()
     val downloadingState by viewModel.modelDownloadingState.collectAsStateWithLifecycle()

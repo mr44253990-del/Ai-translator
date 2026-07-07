@@ -3,19 +3,15 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -26,10 +22,165 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.viewmodel.AppViewModel
 import com.example.viewmodel.DictionaryState
 
+@Composable
+fun StructuredAiResponse(rawResponse: String, onCopy: () -> Unit) {
+    // Simple parser for ### headers
+    val sections = rawResponse.split("###").filter { it.isNotBlank() }
+    
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        sections.forEachIndexed { index, section ->
+            val lines = section.trim().lines()
+            val header = lines.firstOrNull()?.trim() ?: ""
+            val content = lines.drop(1).joinToString("\n").trim()
+            
+            if (header.contains("Summary Header", ignoreCase = true)) {
+                // Header with Stars (Blue/Dark theme)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Yellow, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = content.ifBlank { header },
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else if (header.contains("Input Text", ignoreCase = true)) {
+                // Message Chip
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(32.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = content,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Numbered Section Cards
+                val (color, sectionName, icon) = when {
+                    header.contains("Parts of Speech", ignoreCase = true) -> Triple(Color(0xFF2E7D32), "Parts of Speech", Icons.Default.Category)
+                    header.contains("Tense", ignoreCase = true) -> Triple(Color(0xFF1565C0), "Tense", Icons.Default.Schedule)
+                    header.contains("Meanings", ignoreCase = true) -> Triple(Color(0xFFC2185B), "Meanings", Icons.Default.Language)
+                    else -> Triple(MaterialTheme.colorScheme.secondary, header, Icons.Default.Info)
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
+                ) {
+                    Column {
+                        // Section Header Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(color)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = (index).toString(),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = sectionName,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                        
+                        // Content Area
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(color.copy(alpha = 0.03f))
+                                .padding(16.dp)
+                        ) {
+                            if (header.contains("Tense", ignoreCase = true)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(icon, null, tint = color, modifier = Modifier.size(40.dp))
+                                    Spacer(Modifier.width(16.dp))
+                                    Text(content, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                }
+                            } else {
+                                Text(content, style = MaterialTheme.typography.bodyLarge, lineHeight = 26.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Copy FAB or Button at the end
+        OutlinedButton(
+            onClick = onCopy,
+            modifier = Modifier.align(Alignment.End),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Icon(Icons.Default.ContentCopy, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Copy Full Analysis")
+        }
+        
+        Spacer(Modifier.height(40.dp))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DictionaryScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var textToLookup by remember { mutableStateOf("") }
+fun DictionaryScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
+    var textToLookup by remember { mutableStateOf(initialText ?: "") }
+    
+    // Auto-trigger if initialText is provided
+    LaunchedEffect(initialText) {
+        if (initialText != null) {
+            viewModel.generateDictionaryLookup(initialText)
+        }
+    }
+    
     val dictionaryState by viewModel.dictionaryState.collectAsStateWithLifecycle()
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
     val aiModel by viewModel.aiModel.collectAsStateWithLifecycle()
@@ -126,41 +277,15 @@ fun DictionaryScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             // Results Section
             when (val state = dictionaryState) {
                 is DictionaryState.Success -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Result:", 
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                IconButton(
-                                    onClick = {
-                                        clipboardManager.setText(AnnotatedString(state.result))
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("Result copied to clipboard")
-                                        }
-                                    }
-                                ) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy text")
-                                }
+                    StructuredAiResponse(
+                        rawResponse = state.result,
+                        onCopy = {
+                            clipboardManager.setText(AnnotatedString(state.result))
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Result copied to clipboard")
                             }
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = state.result,
-                                style = MaterialTheme.typography.bodyLarge,
-                                lineHeight = 24.sp
-                            )
                         }
-                    }
+                    )
                 }
                 is DictionaryState.Error -> {
                     Card(

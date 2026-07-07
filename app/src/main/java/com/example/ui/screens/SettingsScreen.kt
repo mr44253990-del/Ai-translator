@@ -223,33 +223,17 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
 
             // 3. AI Configuration
             Text(
-                "AI Configuration (Mistral & Gemini)",
+                "AI Configuration (Mistral)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
 
-            val currentAiModel by viewModel.aiModel.collectAsStateWithLifecycle()
-            val mistralKey by viewModel.mistralApiKey.collectAsStateWithLifecycle()
-            val geminiKey by viewModel.geminiApiKey.collectAsStateWithLifecycle()
             val selectedMistral by viewModel.mistralModel.collectAsStateWithLifecycle()
-            val selectedGemini by viewModel.geminiModel.collectAsStateWithLifecycle()
-
-            var mistralKeyInput by remember { mutableStateOf("") }
-            var geminiKeyInput by remember { mutableStateOf("") }
-            var isVerifying by remember { mutableStateOf(false) }
-
-            LaunchedEffect(mistralKey) {
-                mistralKeyInput = mistralKey
-            }
-            LaunchedEffect(geminiKey) {
-                geminiKeyInput = geminiKey
-            }
+            val streamingEnabled by viewModel.streamingEnabled.collectAsStateWithLifecycle()
 
             val context = androidx.compose.ui.platform.LocalContext.current
-
             val mistralOptions = listOf("mistral-tiny", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest", "open-mixtral-8x7b", "open-mixtral-8x22b")
-            val geminiOptions = listOf("gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro", "gemini-2.0-flash", "gemma-2-2b-it", "gemma-2-9b-it", "gemma-2-27b-it")
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -259,110 +243,31 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "Choose your preferred AI model for online summarization and dictionary lookup.",
+                        "Configure the AI engine. Mistral AI is currently active with a built-in secure key.",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = currentAiModel == "gemini",
-                            onClick = { viewModel.setAiModel("gemini") },
-                            label = { Text("Gemini AI") },
-                            leadingIcon = if (currentAiModel == "gemini") {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(16.dp)) }
-                            } else null,
-                            modifier = Modifier.weight(1f)
-                        )
-                        FilterChip(
-                            selected = currentAiModel == "mistral",
-                            onClick = { viewModel.setAiModel("mistral") },
-                            label = { Text("Mistral AI") },
-                            leadingIcon = if (currentAiModel == "mistral") {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(16.dp)) }
-                            } else null,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    ModelDropdownMenu(
+                        options = mistralOptions,
+                        selectedOption = selectedMistral,
+                        onOptionSelected = { 
+                            viewModel.setMistralModel(it)
+                            android.widget.Toast.makeText(context, "Mistral model updated to $it", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        label = "Select Mistral Model"
+                    )
 
-                    if (currentAiModel == "gemini") {
-                        ModelDropdownMenu(
-                            options = geminiOptions,
-                            selectedOption = selectedGemini,
-                            onOptionSelected = { 
-                                viewModel.setGeminiModel(it)
-                                android.widget.Toast.makeText(context, "Gemini model updated to $it", android.widget.Toast.LENGTH_SHORT).show()
-                            },
-                            label = "Select Gemini Model"
-                        )
-                        
-                        OutlinedTextField(
-                            value = geminiKeyInput,
-                            onValueChange = { geminiKeyInput = it },
-                            label = { Text("Gemini API Key") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
-                        )
-                        
-                        Button(
-                            onClick = {
-                                isVerifying = true
-                                viewModel.setGeminiApiKey(geminiKeyInput)
-                                android.widget.Toast.makeText(context, "Gemini API Key saved successfully!", android.widget.Toast.LENGTH_SHORT).show()
-                                isVerifying = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isVerifying
-                        ) {
-                            if (isVerifying) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
-                            } else {
-                                Icon(Icons.Default.VerifiedUser, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Save Gemini Config")
-                            }
-                        }
-                    }
-
-                    if (currentAiModel == "mistral") {
-                        ModelDropdownMenu(
-                            options = mistralOptions,
-                            selectedOption = selectedMistral,
-                            onOptionSelected = { 
-                                viewModel.setMistralModel(it)
-                                android.widget.Toast.makeText(context, "Mistral model updated to $it", android.widget.Toast.LENGTH_SHORT).show()
-                            },
-                            label = "Select Mistral Model"
-                        )
-
-                        OutlinedTextField(
-                            value = mistralKeyInput,
-                            onValueChange = { mistralKeyInput = it },
-                            label = { Text("Mistral API Key") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
-                        )
-                        
-                        Button(
-                            onClick = {
-                                isVerifying = true
-                                viewModel.setMistralApiKey(mistralKeyInput)
-                                android.widget.Toast.makeText(context, "Mistral API Key saved successfully!", android.widget.Toast.LENGTH_SHORT).show()
-                                isVerifying = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isVerifying
-                        ) {
-                            if (isVerifying) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
-                            } else {
-                                Icon(Icons.Default.VerifiedUser, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Save Mistral Config")
-                            }
-                        }
-                    }
+                    ListItem(
+                        headlineContent = { Text("Live Response Streaming") },
+                        supportingContent = { Text("See AI output in real-time as it's being generated.") },
+                        trailingContent = {
+                            Switch(
+                                checked = streamingEnabled,
+                                onCheckedChange = { viewModel.setStreamingEnabled(it) }
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
                 }
             }
 

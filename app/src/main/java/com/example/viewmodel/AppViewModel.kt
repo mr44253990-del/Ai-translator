@@ -25,8 +25,6 @@ import kotlinx.coroutines.flow.first
 import com.example.BuildConfig
 import com.example.data.MistralService
 import com.example.util.NetworkMonitor
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.content
 import java.util.Locale
 
 sealed class GrammarState {
@@ -108,19 +106,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
 
     // AI Settings
     val aiModel = settingsManager.aiModelFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "mistral")
 
     val mistralApiKey = settingsManager.mistralApiKeyFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuildConfig.MISTRAL_API_KEY)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "EBuoQ4q3D8IcTu1xixZcmf73hNI3tWcB")
 
     val mistralModel = settingsManager.mistralModelFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "mistral-small-latest")
 
-    val geminiApiKey = settingsManager.geminiApiKeyFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuildConfig.GEMINI_API_KEY)
-
-    val geminiModel = settingsManager.geminiModelFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gemini-1.5-flash")
+    val streamingEnabled = settingsManager.streamingEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setAiModel(model: String) {
         viewModelScope.launch {
@@ -140,15 +135,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
         }
     }
 
-    fun setGeminiApiKey(apiKey: String) {
+    fun setStreamingEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            settingsManager.saveGeminiApiKey(apiKey)
-        }
-    }
-
-    fun setGeminiModel(model: String) {
-        viewModelScope.launch {
-            settingsManager.saveGeminiModel(model)
+            settingsManager.saveStreamingEnabled(enabled)
         }
     }
 
@@ -336,28 +325,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     }
 
     private suspend fun getAiResponse(prompt: String): String {
-        val provider = aiModel.value
         return try {
-            if (provider == "mistral") {
-                val key = mistralApiKey.value.ifBlank { BuildConfig.MISTRAL_API_KEY }
-                if (key.isBlank() || key == "PLACEHOLDER" || key.contains("your_")) {
-                    return "Mistral API Key is not configured. Please add your own Mistral API Key in Settings."
-                }
-                val service = MistralService(key)
-                service.generateContent(mistralModel.value, prompt) ?: "Mistral returned empty content."
-            } else {
-                val key = geminiApiKey.value.ifBlank { BuildConfig.GEMINI_API_KEY }
-                if (key.isBlank() || key == "PLACEHOLDER" || key.contains("your_")) {
-                    return "Gemini API Key is not configured. Please add your own Gemini API Key in Settings."
-                }
-                val modelName = geminiModel.value.ifBlank { "gemini-1.5-flash" }
-                val genModel = GenerativeModel(
-                    modelName = modelName,
-                    apiKey = key
-                )
-                val response = genModel.generateContent(prompt)
-                response.text ?: "Gemini returned empty content."
+            val key = mistralApiKey.value.ifBlank { "EBuoQ4q3D8IcTu1xixZcmf73hNI3tWcB" }
+            if (key == "PLACEHOLDER" || key.contains("your_")) {
+                return "Mistral API Key is not configured correctly."
             }
+            val service = MistralService(key)
+            service.generateContent(mistralModel.value, prompt) ?: "Mistral returned empty content."
         } catch (e: Exception) {
             e.printStackTrace()
             "AI Request failed: ${e.localizedMessage ?: "Unknown connection or verification error"}"
@@ -412,12 +386,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
 
                 if (isOnline.value) {
                     val prompt = """
-                        Act as an advanced dictionary. Analyze: "$wordOrSentence"
-                        1. Parts of speech (verb, noun, pronoun, etc.)
-                        2. Tense (Past, Present, Future).
-                        3. Bengali & English meanings.
-                        4. Synonyms.
-                        Return result clearly in Bengali (with English terms in brackets).
+                        Act as an advanced smart dictionary. Analyze the input: "$wordOrSentence"
+                        Provide the response in the following structured format using headers:
+                        
+                        ### Summary Header
+                        এখানে বিশ্লেষণটি বাংলা ও ইংরেজি উত্তর ভাষায় দেওয়া হলো:
+                        
+                        ### Input Text
+                        "$wordOrSentence"
+                        
+                        ### Parts of Speech
+                        (List each word with its category and Bengali explanation)
+                        
+                        ### Tense
+                        (Mention the tense in Bengali and English)
+                        
+                        ### Meanings
+                        (Bengali and English meanings clearly)
+                        
+                        ### Note
+                        (A short concluding note)
+                        
+                        Ensure the output is clean and professional.
                     """.trimIndent()
                     val result = getAiResponse(prompt)
                     _dictionaryState.value = DictionaryState.Success(result)

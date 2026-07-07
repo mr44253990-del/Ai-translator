@@ -28,8 +28,15 @@ import com.example.viewmodel.AiSummaryState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AiSummarizerScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var textToSummarize by remember { mutableStateOf("") }
+fun AiSummarizerScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
+    var textToSummarize by remember { mutableStateOf(initialText ?: "") }
+    
+    // Auto-trigger summary if initialText is provided
+    LaunchedEffect(initialText) {
+        if (initialText != null) {
+            viewModel.generateAiSummary(initialText, "Bangla")
+        }
+    }
     var targetLanguage by remember { mutableStateOf("Bangla") }
 
     val aiSummaryState by viewModel.aiSummaryState.collectAsStateWithLifecycle()

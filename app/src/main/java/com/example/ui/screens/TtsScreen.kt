@@ -110,8 +110,8 @@ fun AudioWaveformVisualizer(isPlaying: Boolean) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TtsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
-    var text by remember { mutableStateOf("") }
+fun TtsScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
+    var text by remember { mutableStateOf(initialText ?: "") }
     var selectedLanguage by remember { mutableStateOf("en") } // "en" or "bn"
     var showSettingsDialog by remember { mutableStateOf(false) }
     

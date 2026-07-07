@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,9 +19,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import com.example.data.HistoryItem
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+fun HistoryScreen(
+    viewModel: AppViewModel, 
+    onBack: () -> Unit,
+    onNavigateToItem: (HistoryItem) -> Unit
+) {
     val historyItems by viewModel.allHistory.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -49,7 +56,11 @@ fun HistoryScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(historyItems) { item ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToItem(item) }
+                    ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

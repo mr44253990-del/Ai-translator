@@ -12,16 +12,16 @@ object OnboardingRoute
 object HomeRoute
 
 @Serializable
-object TtsRoute
+data class TtsRoute(val initialText: String? = null)
 
 @Serializable
-object OcrRoute
+data class OcrRoute(val initialText: String? = null)
 
 @Serializable
-object TranslatorRoute
+data class TranslatorRoute(val initialText: String? = null)
 
 @Serializable
-object AiSummarizerRoute
+data class AiSummarizerRoute(val initialText: String? = null)
 
 @Serializable
 object SettingsRoute
@@ -33,7 +33,7 @@ object HistoryRoute
 object FeedbackRoute
 
 @Serializable
-object DictionaryRoute
+data class DictionaryRoute(val initialText: String? = null)
 
 @Serializable
-object GrammarRoute
+data class GrammarRoute(val initialText: String? = null)

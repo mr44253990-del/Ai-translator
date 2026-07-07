@@ -28,7 +28,7 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OcrScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+fun OcrScreen(viewModel: AppViewModel, initialText: String? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
