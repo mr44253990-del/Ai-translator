@@ -235,9 +235,18 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
             val selectedMistral by viewModel.mistralModel.collectAsStateWithLifecycle()
             val selectedGemini by viewModel.geminiModel.collectAsStateWithLifecycle()
 
-            var mistralKeyInput by remember { mutableStateOf(mistralKey) }
-            var geminiKeyInput by remember { mutableStateOf(geminiKey) }
+            var mistralKeyInput by remember { mutableStateOf("") }
+            var geminiKeyInput by remember { mutableStateOf("") }
             var isVerifying by remember { mutableStateOf(false) }
+
+            LaunchedEffect(mistralKey) {
+                mistralKeyInput = mistralKey
+            }
+            LaunchedEffect(geminiKey) {
+                geminiKeyInput = geminiKey
+            }
+
+            val context = androidx.compose.ui.platform.LocalContext.current
 
             val mistralOptions = listOf("mistral-tiny", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest", "open-mixtral-8x7b", "open-mixtral-8x22b")
             val geminiOptions = listOf("gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro", "gemini-2.0-flash", "gemma-2-2b-it", "gemma-2-9b-it", "gemma-2-27b-it")
@@ -279,7 +288,10 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         ModelDropdownMenu(
                             options = geminiOptions,
                             selectedOption = selectedGemini,
-                            onOptionSelected = { viewModel.setGeminiModel(it) },
+                            onOptionSelected = { 
+                                viewModel.setGeminiModel(it)
+                                android.widget.Toast.makeText(context, "Gemini model updated to $it", android.widget.Toast.LENGTH_SHORT).show()
+                            },
                             label = "Select Gemini Model"
                         )
                         
@@ -296,10 +308,11 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             onClick = {
                                 isVerifying = true
                                 viewModel.setGeminiApiKey(geminiKeyInput)
+                                android.widget.Toast.makeText(context, "Gemini API Key saved successfully!", android.widget.Toast.LENGTH_SHORT).show()
                                 isVerifying = false
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = geminiKeyInput.isNotBlank() && !isVerifying
+                            enabled = !isVerifying
                         ) {
                             if (isVerifying) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
@@ -315,7 +328,10 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                         ModelDropdownMenu(
                             options = mistralOptions,
                             selectedOption = selectedMistral,
-                            onOptionSelected = { viewModel.setMistralModel(it) },
+                            onOptionSelected = { 
+                                viewModel.setMistralModel(it)
+                                android.widget.Toast.makeText(context, "Mistral model updated to $it", android.widget.Toast.LENGTH_SHORT).show()
+                            },
                             label = "Select Mistral Model"
                         )
 
@@ -332,10 +348,11 @@ fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                             onClick = {
                                 isVerifying = true
                                 viewModel.setMistralApiKey(mistralKeyInput)
+                                android.widget.Toast.makeText(context, "Mistral API Key saved successfully!", android.widget.Toast.LENGTH_SHORT).show()
                                 isVerifying = false
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = mistralKeyInput.isNotBlank() && !isVerifying
+                            enabled = !isVerifying
                         ) {
                             if (isVerifying) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)

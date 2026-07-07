@@ -80,6 +80,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     private val _selectedVoiceName = MutableStateFlow("")
     val selectedVoiceName = _selectedVoiceName.asStateFlow()
 
+    private val _isTtsSpeaking = MutableStateFlow(false)
+    val isTtsSpeaking = _isTtsSpeaking.asStateFlow()
+
     // Dynamic Translator Model States
     private val _downloadedModels = MutableStateFlow<Set<String>>(setOf(TranslateLanguage.ENGLISH))
     val downloadedModels = _downloadedModels.asStateFlow()
@@ -170,6 +173,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
             textToSpeech?.setSpeechRate(_ttsSpeed.value)
             textToSpeech?.setPitch(_ttsPitch.value)
             
+            textToSpeech?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    _isTtsSpeaking.value = true
+                }
+                override fun onDone(utteranceId: String?) {
+                    _isTtsSpeaking.value = false
+                }
+                override fun onError(utteranceId: String?) {
+                    _isTtsSpeaking.value = false
+                }
+            })
+
             try {
                 val voices = textToSpeech?.voices?.toList() ?: emptyList()
                 _availableVoices.value = voices
@@ -205,18 +220,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     }
 
     fun speak(text: String, languageCode: String) {
-        if (_ttsReady.value) {
+        if (_ttsReady.value && text.isNotBlank()) {
             val locale = if (languageCode == "bn") Locale("bn", "BD") else Locale.US
             if (_selectedVoiceName.value.isEmpty()) {
                 textToSpeech?.language = locale
             }
-            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            val params = android.os.Bundle()
+            params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "speak_id")
+            textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "speak_id")
             saveHistory("TTS", text, languageCode)
         }
     }
     
     fun stopSpeaking() {
         textToSpeech?.stop()
+        _isTtsSpeaking.value = false
     }
 
     // --- Dynamic ML Kit Translation & Model Downloads ---
@@ -319,19 +337,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
 
     private suspend fun getAiResponse(prompt: String): String {
         val provider = aiModel.value
-        return if (provider == "mistral") {
-            // Check if key changed or service is null
-            if (mistralService == null) {
-                mistralService = MistralService(mistralApiKey.value)
+        return try {
+            if (provider == "mistral") {
+                val key = mistralApiKey.value.ifBlank { BuildConfig.MISTRAL_API_KEY }
+                if (key.isBlank() || key == "PLACEHOLDER" || key.contains("your_")) {
+                    return "Mistral API Key is not configured. Please add your own Mistral API Key in Settings."
+                }
+                val service = MistralService(key)
+                service.generateContent(mistralModel.value, prompt) ?: "Mistral returned empty content."
+            } else {
+                val key = geminiApiKey.value.ifBlank { BuildConfig.GEMINI_API_KEY }
+                if (key.isBlank() || key == "PLACEHOLDER" || key.contains("your_")) {
+                    return "Gemini API Key is not configured. Please add your own Gemini API Key in Settings."
+                }
+                val modelName = geminiModel.value.ifBlank { "gemini-1.5-flash" }
+                val genModel = GenerativeModel(
+                    modelName = modelName,
+                    apiKey = key
+                )
+                val response = genModel.generateContent(prompt)
+                response.text ?: "Gemini returned empty content."
             }
-            mistralService?.generateContent(mistralModel.value, prompt) ?: "Mistral AI error"
-        } else {
-            val genModel = GenerativeModel(
-                modelName = geminiModel.value,
-                apiKey = geminiApiKey.value
-            )
-            val response = genModel.generateContent(prompt)
-            response.text ?: "Gemini AI error"
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "AI Request failed: ${e.localizedMessage ?: "Unknown connection or verification error"}"
         }
     }
 

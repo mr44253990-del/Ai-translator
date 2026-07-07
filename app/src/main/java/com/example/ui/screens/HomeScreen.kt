@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,18 +10,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.viewmodel.AppViewModel
 
@@ -39,6 +40,29 @@ fun HomeScreen(
     onNavigateToGrammar: () -> Unit
 ) {
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+
+    // Dynamic gradient shift for the Hero card
+    val infiniteTransition = rememberInfiniteTransition(label = "hero_gradient")
+    val animatedFloat by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(7000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "gradient_shift"
+    )
+
+    val gradientBrush = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.secondary,
+            MaterialTheme.colorScheme.tertiary,
+            MaterialTheme.colorScheme.primary
+        ),
+        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+        end = androidx.compose.ui.geometry.Offset(1000f * (1f + animatedFloat), 1000f * (1f - animatedFloat))
+    )
 
     Scaffold(
         topBar = {
@@ -78,20 +102,13 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Hero Section
+            // Hero Section with dynamic gradient shifting
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary
-                            )
-                        )
-                    )
+                    .background(gradientBrush)
                     .padding(24.dp)
             ) {
                 Column {
@@ -131,7 +148,8 @@ fun HomeScreen(
                         description = "Listen to text offline",
                         icon = Icons.Default.RecordVoiceOver,
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        onClick = onNavigateToTts
+                        onClick = onNavigateToTts,
+                        delay = 50
                     )
                 }
                 item {
@@ -140,7 +158,8 @@ fun HomeScreen(
                         description = "Extract text from images",
                         icon = Icons.Default.DocumentScanner,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        onClick = onNavigateToOcr
+                        onClick = onNavigateToOcr,
+                        delay = 100
                     )
                 }
                 item {
@@ -149,7 +168,8 @@ fun HomeScreen(
                         description = "En-Bn offline translation",
                         icon = Icons.Default.Translate,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        onClick = onNavigateToTranslate
+                        onClick = onNavigateToTranslate,
+                        delay = 150
                     )
                 }
                 item {
@@ -158,7 +178,8 @@ fun HomeScreen(
                         description = "Smart AI Summarizer",
                         icon = Icons.Default.AutoAwesome,
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        onClick = onNavigateToAi
+                        onClick = onNavigateToAi,
+                        delay = 200
                     )
                 }
                 item {
@@ -167,7 +188,8 @@ fun HomeScreen(
                         description = "Smart grammar & lookup",
                         icon = Icons.Default.MenuBook,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        onClick = onNavigateToDictionary
+                        onClick = onNavigateToDictionary,
+                        delay = 250
                     )
                 }
                 item {
@@ -176,13 +198,28 @@ fun HomeScreen(
                         description = "Fix and rewrite text",
                         icon = Icons.Default.AutoFixHigh,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        onClick = onNavigateToGrammar
+                        onClick = onNavigateToGrammar,
+                        delay = 300
                     )
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    var startFeedbackAnim by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(350)
+                        startFeedbackAnim = true
+                    }
+                    val feedbackAlpha by animateFloatAsState(
+                        targetValue = if (startFeedbackAnim) 1f else 0f,
+                        animationSpec = tween(500, easing = EaseOutQuad),
+                        label = "feedback_alpha"
+                    )
+                    
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .graphicsLayer {
+                                this.alpha = feedbackAlpha
+                            }
                             .clickable { onNavigateToFeedback() },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -226,15 +263,50 @@ fun HomeScreen(
 }
 
 @Composable
-fun DashboardCard(title: String, description: String, icon: ImageVector, containerColor: Color, onClick: () -> Unit) {
+fun DashboardCard(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    containerColor: Color,
+    onClick: () -> Unit,
+    delay: Int = 0
+) {
+    var startAnim by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(delay.toLong())
+        startAnim = true
+    }
+
+    val alpha by animateFloatAsState(
+        targetValue = if (startAnim) 1f else 0f,
+        animationSpec = tween(durationMillis = 600, easing = EaseOutQuad),
+        label = "card_alpha"
+    )
+    val translateY by animateFloatAsState(
+        targetValue = if (startAnim) 0f else 60f,
+        animationSpec = tween(durationMillis = 600, easing = EaseOutBack),
+        label = "card_translateY"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (startAnim) 1f else 0.88f,
+        animationSpec = tween(durationMillis = 600, easing = EaseOutBack),
+        label = "card_scale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.9f)
+            .graphicsLayer {
+                this.alpha = alpha
+                this.translationY = translateY
+                this.scaleX = scale
+                this.scaleY = scale
+            }
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
