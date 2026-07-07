@@ -12,6 +12,10 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,10 +37,31 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
     var sourceLang by remember { mutableStateOf(TranslateLanguage.ENGLISH) }
     var targetLang by remember { mutableStateOf(TranslateLanguage.BENGALI) }
 
+    val languages = remember {
+        listOf(
+            TranslateLanguage.ENGLISH to "English",
+            TranslateLanguage.BENGALI to "Bengali",
+            TranslateLanguage.ARABIC to "Arabic",
+            TranslateLanguage.HINDI to "Hindi",
+            TranslateLanguage.URDU to "Urdu",
+            TranslateLanguage.SPANISH to "Spanish",
+            TranslateLanguage.FRENCH to "French",
+            TranslateLanguage.CHINESE to "Chinese",
+            TranslateLanguage.JAPANESE to "Japanese",
+            TranslateLanguage.RUSSIAN to "Russian",
+            TranslateLanguage.GERMAN to "German"
+        )
+    }
+
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+    val translatorLoading by viewModel.translatorLoading.collectAsStateWithLifecycle()
+
     // Auto-trigger translation if initialText is provided
     LaunchedEffect(initialText) {
         if (initialText != null) {
-            viewModel.translateText(initialText, sourceLang, targetLang) {
+            val sName = languages.find { it.first == sourceLang }?.second ?: "English"
+            val tName = languages.find { it.first == targetLang }?.second ?: "Bengali"
+            viewModel.translateTextHybrid(initialText, sourceLang, targetLang, sName, tName) {
                 translatedText = it
             }
         }
@@ -46,22 +71,6 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
     val downloadingState by viewModel.modelDownloadingState.collectAsStateWithLifecycle()
     val identifiedLanguage by viewModel.identifiedLanguage.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
-
-    val languages = remember {
-        listOf(
-            TranslateLanguage.ENGLISH to "English",
-            TranslateLanguage.BENGALI to "Bengali / বাংলা",
-            TranslateLanguage.ARABIC to "Arabic / العربية",
-            TranslateLanguage.HINDI to "Hindi / हिन्दी",
-            TranslateLanguage.URDU to "Urdu / اردو",
-            TranslateLanguage.SPANISH to "Spanish / Español",
-            TranslateLanguage.FRENCH to "French / Français",
-            TranslateLanguage.CHINESE to "Chinese / 中文",
-            TranslateLanguage.JAPANESE to "Japanese / 日本語",
-            TranslateLanguage.RUSSIAN to "Russian / Русский",
-            TranslateLanguage.GERMAN to "German / Deutsch"
-        )
-    }
 
     var sourceExpanded by remember { mutableStateOf(false) }
     var targetExpanded by remember { mutableStateOf(false) }
@@ -81,7 +90,7 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Offline Translator", fontWeight = FontWeight.Bold) },
+                title = { Text("Smart Translator", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
                 }
@@ -97,6 +106,40 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            
+            // Header Connectivity Card
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isOnline) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isOnline) Icons.Default.CloudQueue else Icons.Default.CloudOff,
+                        contentDescription = null,
+                        tint = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            if (isOnline) "Online AI Mode" else "Offline Local Mode",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isOnline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            if (isOnline) "Using advanced Mistral AI for smart translation." else "Using local ML models on your device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             
             // Language Selection Selectors with Swap
             Card(
@@ -225,63 +268,65 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
             }
 
             // Model Download Indicators (Arabic, Hindi, etc.)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!isSourceDownloaded) {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
-                        Row(
-                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "${languages.find { it.first == sourceLang }?.second} model is required for offline translation.",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Button(
-                                onClick = { viewModel.downloadLanguageModel(sourceLang) },
-                                enabled = !isSourceDownloading,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                modifier = Modifier.height(36.dp)
+            if (!isOnline) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!isSourceDownloaded) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
+                            Row(
+                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                if (isSourceDownloading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("Download", style = MaterialTheme.typography.labelMedium)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "${languages.find { it.first == sourceLang }?.second} model is required for offline translation.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Button(
+                                    onClick = { viewModel.downloadLanguageModel(sourceLang) },
+                                    enabled = !isSourceDownloading,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    if (isSourceDownloading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Text("Download", style = MaterialTheme.typography.labelMedium)
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                if (!isTargetDownloaded && targetLang != sourceLang) {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
-                        Row(
-                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "${languages.find { it.first == targetLang }?.second} model is required for offline translation.",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            Button(
-                                onClick = { viewModel.downloadLanguageModel(targetLang) },
-                                enabled = !isTargetDownloading,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                modifier = Modifier.height(36.dp)
+                    if (!isTargetDownloaded && targetLang != sourceLang) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
+                            Row(
+                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                if (isTargetDownloading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("Download", style = MaterialTheme.typography.labelMedium)
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "${languages.find { it.first == targetLang }?.second} model is required for offline translation.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Button(
+                                    onClick = { viewModel.downloadLanguageModel(targetLang) },
+                                    enabled = !isTargetDownloading,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    if (isTargetDownloading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Text("Download", style = MaterialTheme.typography.labelMedium)
+                                    }
                                 }
                             }
                         }
@@ -319,12 +364,31 @@ fun TranslatorScreen(viewModel: AppViewModel, initialText: String? = null, onBac
             // Translate action button
             Button(
                 onClick = {
-                    viewModel.translateText(textToTranslate, sourceLang, targetLang) { translatedText = it }
+                    val sName = languages.find { it.first == sourceLang }?.second ?: "English"
+                    val tName = languages.find { it.first == targetLang }?.second ?: "Bengali"
+                    viewModel.translateTextHybrid(textToTranslate, sourceLang, targetLang, sName, tName) {
+                        translatedText = it
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = isSourceDownloaded && isTargetDownloaded && textToTranslate.isNotBlank()
+                enabled = (isOnline || (isSourceDownloaded && isTargetDownloaded)) && textToTranslate.isNotBlank() && !translatorLoading
             ) {
-                Text("Translate Offline")
+                if (translatorLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Translating...")
+                } else {
+                    Icon(
+                        imageVector = if (isOnline) Icons.Default.AutoAwesome else Icons.Default.Translate,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isOnline) "Translate with AI (Online)" else "Translate Offline")
+                }
             }
 
             // Results Card

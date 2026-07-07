@@ -37,7 +37,9 @@ fun HomeScreen(
     onNavigateToFeedback: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDictionary: () -> Unit,
-    onNavigateToGrammar: () -> Unit
+    onNavigateToGrammar: () -> Unit,
+    onNavigateToChat: () -> Unit,
+    onNavigateToPhrasebook: () -> Unit
 ) {
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
 
@@ -200,6 +202,26 @@ fun HomeScreen(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         onClick = onNavigateToGrammar,
                         delay = 300
+                    )
+                }
+                item {
+                    DashboardCard(
+                        title = "AI Chat Partner",
+                        description = "Practice foreign speaking",
+                        icon = Icons.Default.Forum,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        onClick = onNavigateToChat,
+                        delay = 350
+                    )
+                }
+                item {
+                    DashboardCard(
+                        title = "Travel Phrasebook",
+                        description = "AI authentic traveler phrases",
+                        icon = Icons.Default.Map,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        onClick = onNavigateToPhrasebook,
+                        delay = 400
                     )
                 }
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {

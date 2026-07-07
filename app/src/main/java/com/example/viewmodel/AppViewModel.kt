@@ -27,6 +27,22 @@ import com.example.data.MistralService
 import com.example.util.NetworkMonitor
 import java.util.Locale
 
+data class ChatMessage(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val text: String,
+    val isUser: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class PhraseItem(val original: String, val translation: String, val pronunciation: String)
+
+sealed class PhrasebookState {
+    object Idle : PhrasebookState()
+    object Loading : PhrasebookState()
+    data class Success(val phrases: List<PhraseItem>) : PhrasebookState()
+    data class Error(val message: String) : PhrasebookState()
+}
+
 sealed class GrammarState {
     object Idle : GrammarState()
     object Loading : GrammarState()
@@ -91,6 +107,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     // AI Summarizer State
     private val _aiSummaryState = MutableStateFlow<AiSummaryState>(AiSummaryState.Idle)
     val aiSummaryState = _aiSummaryState.asStateFlow()
+
+    // New Features States: AI Chat, Travel Phrasebook, and Hybrid Translation loading
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages = _chatMessages.asStateFlow()
+
+    private val _chatLoading = MutableStateFlow(false)
+    val chatLoading = _chatLoading.asStateFlow()
+
+    private val _phrasebookState = MutableStateFlow<PhrasebookState>(PhrasebookState.Idle)
+    val phrasebookState = _phrasebookState.asStateFlow()
+
+    private val _translatorLoading = MutableStateFlow(false)
+    val translatorLoading = _translatorLoading.asStateFlow()
 
     // Dictionary State
     private val _dictionaryState = MutableStateFlow<DictionaryState>(DictionaryState.Idle)
@@ -524,6 +553,170 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
         viewModelScope.launch {
             historyDao.clearHistory()
         }
+    }
+
+    fun translateTextHybrid(
+        text: String,
+        sourceLangCode: String,
+        targetLangCode: String,
+        sourceLangName: String,
+        targetLangName: String,
+        onResult: (String) -> Unit
+    ) {
+        if (text.isBlank()) {
+            onResult("")
+            return
+        }
+        if (isOnline.value) {
+            _translatorLoading.value = true
+            viewModelScope.launch {
+                try {
+                    val prompt = """
+                        You are a highly precise translator. 
+                        Translate the following user input from $sourceLangName to $targetLangName.
+                        If the user input is written in a different language than $sourceLangName, automatically detect the input language and translate it to $targetLangName.
+                        
+                        CRITICAL SAFETY & QUALITY INSTRUCTION:
+                        Return ONLY the raw translated text. Do NOT include any intro ("Here is the translation:"), notes, explanations, grammar warnings, markdown wrappers, or conversational filler. What you return must be ready to replace the user's input.
+                        
+                        Text to translate:
+                        $text
+                    """.trimIndent()
+                    val result = getAiResponse(prompt)
+                    onResult(result.trim())
+                    saveHistory("TRANSLATION_ONLINE", text, result)
+                } catch (e: Exception) {
+                    onResult("Error: ${e.localizedMessage}")
+                } finally {
+                    _translatorLoading.value = false
+                }
+            }
+        } else {
+            _translatorLoading.value = true
+            translateText(text, sourceLangCode, targetLangCode) { result ->
+                onResult(result)
+                _translatorLoading.value = false
+            }
+        }
+    }
+
+    fun sendMessage(text: String, language: String) {
+        if (text.isBlank()) return
+        val userMsg = ChatMessage(text = text, isUser = true)
+        _chatMessages.value = _chatMessages.value + userMsg
+        
+        viewModelScope.launch {
+            _chatLoading.value = true
+            try {
+                val conversationHistory = _chatMessages.value.takeLast(10).joinToString("\n") { 
+                    if (it.isUser) "User: ${it.text}" else "AI: ${it.text}"
+                }
+                val prompt = """
+                    You are a friendly language learning conversation partner.
+                    The user wants to practice speaking/writing in the language: $language.
+                    Respond to their message in $language naturally and encourage the conversation.
+                    Keep your response concise (1-3 sentences) and easy to understand for language learning.
+                    If they make obvious grammatical mistakes, gently point out the correct form in a friendly way, but keep the conversation rolling.
+                    
+                    Conversation context:
+                    $conversationHistory
+                """.trimIndent()
+                val response = getAiResponse(prompt)
+                _chatMessages.value = _chatMessages.value + ChatMessage(text = response.trim(), isUser = false)
+            } catch (e: Exception) {
+                _chatMessages.value = _chatMessages.value + ChatMessage(text = "Error: Could not get response.", isUser = false)
+            } finally {
+                _chatLoading.value = false
+            }
+        }
+    }
+
+    fun clearChat() {
+        _chatMessages.value = emptyList()
+    }
+
+    fun generatePhrases(category: String, targetLanguage: String) {
+        _phrasebookState.value = PhrasebookState.Loading
+        viewModelScope.launch {
+            try {
+                if (isOnline.value) {
+                    val prompt = """
+                        Generate 5 essential traveler phrases for the category: "$category".
+                        Translate these phrases from English to $targetLanguage.
+                        Provide the response strictly in the following JSON array format:
+                        [
+                          {"original": "English phrase", "translation": "Translated phrase", "pronunciation": "Pronunciation spelling or romanization"}
+                        ]
+                        Do not include any other text, notes, markdown wrapper (like ```json), or explanation outside of the valid JSON block.
+                    """.trimIndent()
+                    val result = getAiResponse(prompt)
+                    
+                    val cleanJson = result.trim().removeSurrounding("```json", "```").trim()
+                    val phraseList = parsePhrasesJson(cleanJson)
+                    _phrasebookState.value = PhrasebookState.Success(phraseList)
+                } else {
+                    val staticPhrases = when(category.lowercase()) {
+                        "greetings" -> listOf(
+                            PhraseItem("Hello", "হ্যালো / ওহে", "Hello / Ohe"),
+                            PhraseItem("Good morning", "শুভ সকাল", "Shuvo Sokal"),
+                            PhraseItem("Thank you", "ধন্যবাদ", "Dhonnobad"),
+                            PhraseItem("How are you?", "আপনি কেমন আছেন?", "Apni kemon achen?"),
+                            PhraseItem("Goodbye", "বিদায়", "Biday")
+                        )
+                        "dining" -> listOf(
+                            PhraseItem("Water, please", "জল, দয়া করে", "Jol, doya kore"),
+                            PhraseItem("How much is this?", "এটার দাম কত?", "Etar dam koto?"),
+                            PhraseItem("Delicious", "সুস্বাদু", "Suswadu"),
+                            PhraseItem("Bill, please", "বিলটি দিন, দয়া করে", "Bilti din, doya kore"),
+                            PhraseItem("I am hungry", "আমি ক্ষুধার্ত", "Ami khudarto")
+                        )
+                        "travel" -> listOf(
+                            PhraseItem("Where is the train station?", "রেল স্টেশনটি কোথায়?", "Rail station kothay?"),
+                            PhraseItem("Can you help me?", "আপনি কি আমাকে সাহায্য করতে পারেন?", "Apni ki amake sahajjo korte paren?"),
+                            PhraseItem("Ticket", "টিকিট", "Ticket"),
+                            PhraseItem("Where is the hotel?", "হোটেলটি কোথায়?", "Hotelti kothay?"),
+                            PhraseItem("Stop here", "এখানে থামুন", "Ekhane thamun")
+                        )
+                        else -> listOf(
+                            PhraseItem("Where is the hospital?", "হাসপাতাল কোথায়?", "Hospital kothay?"),
+                            PhraseItem("Help me", "আমাকে সাহায্য করুন", "Amake sahajjo korun"),
+                            PhraseItem("Excuse me", "মাফ করবেন", "Maf korben"),
+                            PhraseItem("Yes", "হ্যাঁ", "Hya"),
+                            PhraseItem("No", "না", "Na")
+                        )
+                    }
+                    _phrasebookState.value = PhrasebookState.Success(staticPhrases)
+                }
+            } catch (e: Exception) {
+                _phrasebookState.value = PhrasebookState.Error(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    private fun parsePhrasesJson(json: String): List<PhraseItem> {
+        val list = mutableListOf<PhraseItem>()
+        try {
+            val regex = """\{\s*"original"\s*:\s*"([^"]*)"\s*,\s*"translation"\s*:\s*"([^"]*)"\s*,\s*"pronunciation"\s*:\s*"([^"]*)"\s*\}""".toRegex()
+            val matches = regex.findAll(json)
+            for (match in matches) {
+                val original = match.groupValues[1]
+                val translation = match.groupValues[2]
+                val pronunciation = match.groupValues[3]
+                list.add(PhraseItem(original, translation, pronunciation))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        if (list.isEmpty()) {
+            return listOf(
+                PhraseItem("Hello", "হ্যালো", "Hello"),
+                PhraseItem("Thank you", "ধন্যবাদ", "Dhonnobad"),
+                PhraseItem("How much is this?", "এটার দাম কত?", "Etar dam koto?"),
+                PhraseItem("Where is this?", "এটি কোথায়?", "Eti kothay?"),
+                PhraseItem("Good morning", "শুভ সকাল", "Shuvo Sokal")
+            )
+        }
+        return list
     }
 
     override fun onCleared() {

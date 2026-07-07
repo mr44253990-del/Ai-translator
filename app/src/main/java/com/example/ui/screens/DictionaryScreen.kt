@@ -98,7 +98,7 @@ fun StructuredAiResponse(rawResponse: String, onCopy: () -> Unit) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
                 ) {
@@ -136,17 +136,27 @@ fun StructuredAiResponse(rawResponse: String, onCopy: () -> Unit) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(color.copy(alpha = 0.03f))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f))
                                 .padding(16.dp)
                         ) {
                             if (header.contains("Tense", ignoreCase = true)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(icon, null, tint = color, modifier = Modifier.size(40.dp))
                                     Spacer(Modifier.width(16.dp))
-                                    Text(content, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        text = content, 
+                                        style = MaterialTheme.typography.bodyLarge, 
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             } else {
-                                Text(content, style = MaterialTheme.typography.bodyLarge, lineHeight = 26.sp)
+                                Text(
+                                    text = content, 
+                                    style = MaterialTheme.typography.bodyLarge, 
+                                    lineHeight = 26.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     }

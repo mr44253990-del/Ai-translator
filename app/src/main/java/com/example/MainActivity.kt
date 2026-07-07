@@ -70,7 +70,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToFeedback = { navController.navigate(FeedbackRoute) },
                                 onNavigateToSettings = { navController.navigate(SettingsRoute) },
                                 onNavigateToDictionary = { navController.navigate(DictionaryRoute()) },
-                                onNavigateToGrammar = { navController.navigate(GrammarRoute()) }
+                                onNavigateToGrammar = { navController.navigate(GrammarRoute()) },
+                                onNavigateToChat = { navController.navigate(ChatRoute) },
+                                onNavigateToPhrasebook = { navController.navigate(PhrasebookRoute) }
                             )
                         }
                         composable<TtsRoute> { backStackEntry ->
@@ -120,6 +122,12 @@ class MainActivity : ComponentActivity() {
                         composable<GrammarRoute> { backStackEntry ->
                             val route = backStackEntry.toRoute<GrammarRoute>()
                             GrammarScreen(viewModel = viewModel, initialText = route.initialText, onBack = { navController.popBackStack() })
+                        }
+                        composable<ChatRoute> {
+                            ChatScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+                        }
+                        composable<PhrasebookRoute> {
+                            PhrasebookScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
                         }
                     }
                 }

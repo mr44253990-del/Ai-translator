@@ -37,3 +37,9 @@ data class DictionaryRoute(val initialText: String? = null)
 
 @Serializable
 data class GrammarRoute(val initialText: String? = null)
+
+@Serializable
+object ChatRoute
+
+@Serializable
+object PhrasebookRoute
