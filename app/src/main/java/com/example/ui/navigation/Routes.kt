@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 object SplashRoute
 
 @Serializable
+object OnboardingRoute
+
+@Serializable
 object HomeRoute
 
 @Serializable

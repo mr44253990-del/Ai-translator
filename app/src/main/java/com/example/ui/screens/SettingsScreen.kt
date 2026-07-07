@@ -1,0 +1,341 @@
+package com.example.ui.screens
+
+import android.speech.tts.Voice
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.viewmodel.AppViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(viewModel: AppViewModel, onBack: () -> Unit) {
+    val currentTheme by viewModel.appTheme.collectAsStateWithLifecycle()
+    val ttsSpeed by viewModel.ttsSpeed.collectAsStateWithLifecycle()
+    val ttsPitch by viewModel.ttsPitch.collectAsStateWithLifecycle()
+    val voices by viewModel.availableVoices.collectAsStateWithLifecycle()
+    val selectedVoiceName by viewModel.selectedVoiceName.collectAsStateWithLifecycle()
+
+    var voiceExpanded by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            
+            // 1. Theme Configuration
+            Text(
+                "App Theme",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "Select your preferred color scheme. The visual style will update instantly throughout the application.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ThemeOptionCard(
+                            name = "Violet",
+                            themeId = "violet",
+                            color = Color(0xFF6650a4),
+                            isSelected = currentTheme == "violet",
+                            onClick = { viewModel.setAppTheme("violet") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        ThemeOptionCard(
+                            name = "Forest Green",
+                            themeId = "green",
+                            color = Color(0xFF059669),
+                            isSelected = currentTheme == "green",
+                            onClick = { viewModel.setAppTheme("green") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ThemeOptionCard(
+                            name = "Sunset Gold",
+                            themeId = "orange",
+                            color = Color(0xFFEA580C),
+                            isSelected = currentTheme == "orange",
+                            onClick = { viewModel.setAppTheme("orange") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        ThemeOptionCard(
+                            name = "Cosmic Slate",
+                            themeId = "slate",
+                            color = Color(0xFF4F46E5),
+                            isSelected = currentTheme == "slate",
+                            onClick = { viewModel.setAppTheme("slate") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // 2. TTS Configuration
+            Text(
+                "Text-To-Speech Settings",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Speed rate slider
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Speech Speed Rate", style = MaterialTheme.typography.titleSmall)
+                            Text(String.format("%.1fx", ttsSpeed), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        Slider(
+                            value = ttsSpeed,
+                            onValueChange = { viewModel.setTtsSpeed(it) },
+                            valueRange = 0.5f..2.5f,
+                            steps = 19
+                        )
+                    }
+
+                    // Pitch slider
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Speech Pitch Level", style = MaterialTheme.typography.titleSmall)
+                            Text(String.format("%.1fx", ttsPitch), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                        Slider(
+                            value = ttsPitch,
+                            onValueChange = { viewModel.setTtsPitch(it) },
+                            valueRange = 0.5f..2.0f,
+                            steps = 14
+                        )
+                    }
+
+                    // Voice list selection
+                    if (voices.isNotEmpty()) {
+                        Column {
+                            Text("Speech Voice Profile", style = MaterialTheme.typography.titleSmall)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedCard(
+                                    onClick = { voiceExpanded = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            if (selectedVoiceName.isNotEmpty()) selectedVoiceName.take(30) else "Default Android Voice",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = voiceExpanded,
+                                    onDismissRequest = { voiceExpanded = false },
+                                    modifier = Modifier.fillMaxWidth(0.9f)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Default Android System Voice") },
+                                        onClick = {
+                                            viewModel.setTtsVoice(voices.first()) // backup / default
+                                            voiceExpanded = false
+                                        }
+                                    )
+                                    voices.take(15).forEach { voice ->
+                                        DropdownMenuItem(
+                                            text = { Text("${voice.locale.displayName} (${voice.name.takeLast(10)})") },
+                                            onClick = {
+                                                viewModel.setTtsVoice(voice)
+                                                voiceExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Developer & App Info
+            Text(
+                "Developer & App Information",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Created By", style = MaterialTheme.typography.labelSmall)
+                            Text("Rakibul (রকিবুল)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondary)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Privacy Guarantee", style = MaterialTheme.typography.labelSmall)
+                            Text("100% Offline & Private (No external API calls)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.tertiary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiary)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Application Version", style = MaterialTheme.typography.labelSmall)
+                            Text("v1.0.0 (rakib.translator.ai)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThemeOptionCard(
+    name: String,
+    themeId: String,
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedCard(
+        onClick = onClick,
+        border = BorderStroke(
+            width = if (isSelected) 3.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+        ),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
+        }
+    }
+}

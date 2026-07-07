@@ -7,9 +7,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.HistoryItem
 import com.example.data.SettingsManager
+import com.example.data.Text2Summary
 import com.example.di.DatabaseProvider
+import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     val allHistory: StateFlow<List<HistoryItem>> = historyDao.getAllHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // App Preferences (First launch and Theme)
+    val firstLaunch = settingsManager.firstLaunchFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val appTheme = settingsManager.appThemeFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "violet")
+
+    fun setFirstLaunch(first: Boolean) {
+        viewModelScope.launch {
+            settingsManager.saveFirstLaunch(first)
+        }
+    }
+
+    fun setAppTheme(theme: String) {
+        viewModelScope.launch {
+            settingsManager.saveAppTheme(theme)
+        }
+    }
+
     // TTS Settings
     private val _ttsSpeed = MutableStateFlow(1.0f)
     val ttsSpeed = _ttsSpeed.asStateFlow()
@@ -46,21 +68,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
     private val _selectedVoiceName = MutableStateFlow("")
     val selectedVoiceName = _selectedVoiceName.asStateFlow()
 
-    // ML Kit Translator
-    private val _translatorReady = MutableStateFlow(false)
-    val translatorReady = _translatorReady.asStateFlow()
-    private val _downloadProgress = MutableStateFlow(0f)
-    val downloadProgress = _downloadProgress.asStateFlow()
-    private val _isDownloading = MutableStateFlow(false)
-    val isDownloading = _isDownloading.asStateFlow()
+    // Dynamic Translator Model States
+    private val _downloadedModels = MutableStateFlow<Set<String>>(setOf(TranslateLanguage.ENGLISH))
+    val downloadedModels = _downloadedModels.asStateFlow()
 
-    // AI Summarizer (Mocked ONNX)
+    private val _modelDownloadingState = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val modelDownloadingState = _modelDownloadingState.asStateFlow()
+
+    // AI Summarizer State
     private val _aiSummaryState = MutableStateFlow<AiSummaryState>(AiSummaryState.Idle)
     val aiSummaryState = _aiSummaryState.asStateFlow()
 
     init {
         textToSpeech = TextToSpeech(application, this)
-        checkAndDownloadTranslatorModel()
+        checkDownloadedModels()
+        // Guarantee Bengali model is ready/downloaded initially
+        downloadLanguageModel(TranslateLanguage.BENGALI)
         
         viewModelScope.launch {
             _ttsSpeed.value = settingsManager.ttsSpeedFlow.first()
@@ -111,7 +134,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
 
     fun speak(text: String, languageCode: String) {
         if (_ttsReady.value) {
-            // Only set language if we haven't selected a specific voice or if we want to force locale
             val locale = if (languageCode == "bn") Locale("bn", "BD") else Locale.US
             if (_selectedVoiceName.value.isEmpty()) {
                 textToSpeech?.language = locale
@@ -125,70 +147,173 @@ class AppViewModel(application: Application) : AndroidViewModel(application), Te
         textToSpeech?.stop()
     }
 
-    // --- ML Kit Translation ---
-    private fun checkAndDownloadTranslatorModel() {
-        _isDownloading.value = true
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.BENGALI)
-            .build()
-        val englishBengaliTranslator = Translation.getClient(options)
+    // --- Dynamic ML Kit Translation & Model Downloads ---
+    fun checkDownloadedModels() {
+        val modelManager = RemoteModelManager.getInstance()
+        val languagesToCheck = listOf(
+            TranslateLanguage.BENGALI,
+            TranslateLanguage.ARABIC,
+            TranslateLanguage.HINDI,
+            TranslateLanguage.URDU,
+            TranslateLanguage.SPANISH,
+            TranslateLanguage.FRENCH,
+            TranslateLanguage.CHINESE,
+            TranslateLanguage.JAPANESE,
+            TranslateLanguage.RUSSIAN,
+            TranslateLanguage.GERMAN
+        )
         
-        var conditions = DownloadConditions.Builder().build()
+        viewModelScope.launch {
+            for (lang in languagesToCheck) {
+                val model = TranslateRemoteModel.Builder(lang).build()
+                modelManager.isModelDownloaded(model)
+                    .addOnSuccessListener { isDownloaded ->
+                        if (isDownloaded) {
+                            _downloadedModels.value = _downloadedModels.value + lang
+                        }
+                    }
+            }
+        }
+    }
+
+    fun downloadLanguageModel(langCode: String, onComplete: (Boolean) -> Unit = {}) {
+        if (_downloadedModels.value.contains(langCode)) {
+            onComplete(true)
+            return
+        }
+        _modelDownloadingState.value = _modelDownloadingState.value + (langCode to true)
+        val model = TranslateRemoteModel.Builder(langCode).build()
+        val modelManager = RemoteModelManager.getInstance()
+        val conditions = DownloadConditions.Builder().build()
         
-        englishBengaliTranslator.downloadModelIfNeeded(conditions)
+        modelManager.download(model, conditions)
             .addOnSuccessListener {
-                _translatorReady.value = true
-                _isDownloading.value = false
+                _downloadedModels.value = _downloadedModels.value + langCode
+                _modelDownloadingState.value = _modelDownloadingState.value + (langCode to false)
+                onComplete(true)
             }
             .addOnFailureListener {
-                _isDownloading.value = false
+                _modelDownloadingState.value = _modelDownloadingState.value + (langCode to false)
+                onComplete(false)
             }
     }
 
+    fun translateText(
+        text: String,
+        sourceLangCode: String,
+        targetLangCode: String,
+        onResult: (String) -> Unit
+    ) {
+        // Ensure source model is downloaded
+        downloadLanguageModel(sourceLangCode) { sourceOk ->
+            if (!sourceOk) {
+                onResult("Error: Source language model download failed")
+                return@downloadLanguageModel
+            }
+            // Ensure target model is downloaded
+            downloadLanguageModel(targetLangCode) { targetOk ->
+                if (!targetOk) {
+                    onResult("Error: Target language model download failed")
+                    return@downloadLanguageModel
+                }
+                
+                // Perform translation
+                val options = TranslatorOptions.Builder()
+                    .setSourceLanguage(sourceLangCode)
+                    .setTargetLanguage(targetLangCode)
+                    .build()
+                val translator = Translation.getClient(options)
+                
+                translator.translate(text)
+                    .addOnSuccessListener { translated ->
+                        saveHistory("TRANSLATION", text, translated)
+                        onResult(translated)
+                    }
+                    .addOnFailureListener { e ->
+                        onResult("Error: ${e.localizedMessage}")
+                    }
+            }
+        }
+    }
+
+    // Maintain backwards compatibility helper methods
     fun translateEnToBn(text: String, onResult: (String) -> Unit) {
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.ENGLISH)
-            .setTargetLanguage(TranslateLanguage.BENGALI)
-            .build()
-        val translator = Translation.getClient(options)
-        translator.translate(text)
-            .addOnSuccessListener {
-                saveHistory("TRANSLATION", text, it)
-                onResult(it)
-            }
-            .addOnFailureListener { onResult("Error translating") }
-    }
-    
-    fun translateBnToEn(text: String, onResult: (String) -> Unit) {
-        val options = TranslatorOptions.Builder()
-            .setSourceLanguage(TranslateLanguage.BENGALI)
-            .setTargetLanguage(TranslateLanguage.ENGLISH)
-            .build()
-        val translator = Translation.getClient(options)
-        translator.translate(text)
-            .addOnSuccessListener {
-                saveHistory("TRANSLATION", text, it)
-                onResult(it)
-            }
-            .addOnFailureListener { onResult("Error translating") }
+        translateText(text, TranslateLanguage.ENGLISH, TranslateLanguage.BENGALI, onResult)
     }
 
-    // --- AI Summarizer (Mocked ONNX for CPU) ---
+    fun translateBnToEn(text: String, onResult: (String) -> Unit) {
+        translateText(text, TranslateLanguage.BENGALI, TranslateLanguage.ENGLISH, onResult)
+    }
+
+    // --- Dynamic Offline NLP Summarizer with Translation ---
     fun generateAiSummary(text: String, targetLanguage: String) {
         viewModelScope.launch {
             _aiSummaryState.value = AiSummaryState.Loading
-            kotlinx.coroutines.delay(2000) // Simulate offline CPU inference
             try {
-                // Since we cannot package a 500MB GGUF/ONNX model in the browser emulator,
-                // we mock the offline inference output to demonstrate the UI works as requested.
-                val resultText = if (targetLanguage == "Bangla") {
-                    "অফলাইন এআই মডেল (ONNX) থেকে সারসংক্ষেপ: এটি একটি পরীক্ষামূলক টেক্সট।"
-                } else {
-                    "Offline AI Model (ONNX) Summary: This is an experimental text."
+                // Perform local NLP TF-IDF text summarization (completely offline, zero API call/GGUF size)
+                val summary = Text2Summary.summarize(text, compressionFactor = 0.5f)
+                
+                if (summary.isBlank()) {
+                    _aiSummaryState.value = AiSummaryState.Success("No content to summarize.")
+                    return@launch
                 }
-                _aiSummaryState.value = AiSummaryState.Success(resultText)
-                saveHistory("AI_SUMMARY", text, resultText)
+
+                // If target language is Bangla, translate the summary
+                if (targetLanguage == "Bangla") {
+                    // Identify text language first
+                    val languageIdentifier = com.google.mlkit.nl.languageid.LanguageIdentification.getClient()
+                    languageIdentifier.identifyLanguage(summary)
+                        .addOnSuccessListener { identifiedCode ->
+                            val sourceCode = if (identifiedCode == "und" || identifiedCode == "bn") {
+                                TranslateLanguage.ENGLISH // fallback
+                            } else {
+                                identifiedCode
+                            }
+                            
+                            if (sourceCode == TranslateLanguage.BENGALI) {
+                                _aiSummaryState.value = AiSummaryState.Success(summary)
+                                saveHistory("AI_SUMMARY", text, summary)
+                            } else {
+                                translateText(summary, sourceCode, TranslateLanguage.BENGALI) { translatedSummary ->
+                                    _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
+                                    saveHistory("AI_SUMMARY", text, translatedSummary)
+                                }
+                            }
+                        }
+                        .addOnFailureListener {
+                            translateText(summary, TranslateLanguage.ENGLISH, TranslateLanguage.BENGALI) { translatedSummary ->
+                                _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
+                                saveHistory("AI_SUMMARY", text, translatedSummary)
+                            }
+                        }
+                } else {
+                    // Target language is English
+                    val languageIdentifier = com.google.mlkit.nl.languageid.LanguageIdentification.getClient()
+                    languageIdentifier.identifyLanguage(summary)
+                        .addOnSuccessListener { identifiedCode ->
+                            val sourceCode = if (identifiedCode == "und") {
+                                TranslateLanguage.BENGALI // fallback
+                            } else {
+                                identifiedCode
+                            }
+                            
+                            if (sourceCode == TranslateLanguage.ENGLISH) {
+                                _aiSummaryState.value = AiSummaryState.Success(summary)
+                                saveHistory("AI_SUMMARY", text, summary)
+                            } else {
+                                translateText(summary, sourceCode, TranslateLanguage.ENGLISH) { translatedSummary ->
+                                    _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
+                                    saveHistory("AI_SUMMARY", text, translatedSummary)
+                                }
+                            }
+                        }
+                        .addOnFailureListener {
+                            translateText(summary, TranslateLanguage.BENGALI, TranslateLanguage.ENGLISH) { translatedSummary ->
+                                _aiSummaryState.value = AiSummaryState.Success(translatedSummary)
+                                saveHistory("AI_SUMMARY", text, translatedSummary)
+                            }
+                        }
+                }
             } catch (e: Exception) {
                 _aiSummaryState.value = AiSummaryState.Error(e.message ?: "Unknown error")
             }

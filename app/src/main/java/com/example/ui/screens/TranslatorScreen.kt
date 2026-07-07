@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,6 +9,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,18 +21,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.viewmodel.AppViewModel
+import com.google.mlkit.nl.translate.TranslateLanguage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TranslatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     var textToTranslate by remember { mutableStateOf("") }
     var translatedText by remember { mutableStateOf("") }
-    var direction by remember { mutableStateOf("EnToBn") } // EnToBn or BnToEn
+    
+    // Default translation pair: English to Bengali
+    var sourceLang by remember { mutableStateOf(TranslateLanguage.ENGLISH) }
+    var targetLang by remember { mutableStateOf(TranslateLanguage.BENGALI) }
 
-    val isReady by viewModel.translatorReady.collectAsStateWithLifecycle()
-    val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
+    val downloadedModels by viewModel.downloadedModels.collectAsStateWithLifecycle()
+    val downloadingState by viewModel.modelDownloadingState.collectAsStateWithLifecycle()
     val identifiedLanguage by viewModel.identifiedLanguage.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
+
+    val languages = remember {
+        listOf(
+            TranslateLanguage.ENGLISH to "English",
+            TranslateLanguage.BENGALI to "Bengali / বাংলা",
+            TranslateLanguage.ARABIC to "Arabic / العربية",
+            TranslateLanguage.HINDI to "Hindi / हिन्दी",
+            TranslateLanguage.URDU to "Urdu / اردو",
+            TranslateLanguage.SPANISH to "Spanish / Español",
+            TranslateLanguage.FRENCH to "French / Français",
+            TranslateLanguage.CHINESE to "Chinese / 中文",
+            TranslateLanguage.JAPANESE to "Japanese / 日本語",
+            TranslateLanguage.RUSSIAN to "Russian / Русский",
+            TranslateLanguage.GERMAN to "German / Deutsch"
+        )
+    }
+
+    var sourceExpanded by remember { mutableStateOf(false) }
+    var targetExpanded by remember { mutableStateOf(false) }
+
+    val isSourceDownloaded = downloadedModels.contains(sourceLang)
+    val isTargetDownloaded = downloadedModels.contains(targetLang)
+
+    val isSourceDownloading = downloadingState[sourceLang] == true
+    val isTargetDownloading = downloadingState[targetLang] == true
 
     DisposableEffect(Unit) {
         onDispose {
@@ -53,49 +87,208 @@ fun TranslatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (isDownloading) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Row(
-                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+            
+            // Language Selection Selectors with Swap
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Source Dropdown
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedCard(
+                            onClick = { sourceExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("From", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        languages.find { it.first == sourceLang }?.second ?: sourceLang,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = sourceExpanded,
+                            onDismissRequest = { sourceExpanded = false }
+                        ) {
+                            languages.forEach { (code, name) ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(name)
+                                            if (downloadedModels.contains(code)) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        sourceLang = code
+                                        sourceExpanded = false
+                                        translatedText = ""
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Swap Button
+                    IconButton(
+                        onClick = {
+                            val temp = sourceLang
+                            sourceLang = targetLang
+                            targetLang = temp
+                            translatedText = ""
+                        },
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(16.dp))
-                        Text("Downloading translation models...")
+                        Icon(Icons.Default.SwapHoriz, contentDescription = "Swap languages")
                     }
-                }
-            } else if (!isReady) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                    Row(modifier = Modifier.padding(16.dp)) {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Model not ready. Please check internet connection to download initially.")
+
+                    // Target Dropdown
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedCard(
+                            onClick = { targetExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("To", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        languages.find { it.first == targetLang }?.second ?: targetLang,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = targetExpanded,
+                            onDismissRequest = { targetExpanded = false }
+                        ) {
+                            languages.forEach { (code, name) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(name)
+                                            if (downloadedModels.contains(code)) {
+                                                Icon(Icons.Default.CheckCircle, contentDescription = "Downloaded", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        targetLang = code
+                                        targetExpanded = false
+                                        translatedText = ""
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = direction == "EnToBn",
-                    onClick = { direction = "EnToBn"; translatedText = "" },
-                    label = { Text("English to Bangla") }
-                )
-                FilterChip(
-                    selected = direction == "BnToEn",
-                    onClick = { direction = "BnToEn"; translatedText = "" },
-                    label = { Text("Bangla to English") }
-                )
+            // Model Download Indicators (Arabic, Hindi, etc.)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!isSourceDownloaded) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "${languages.find { it.first == sourceLang }?.second} model is required for offline translation.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Button(
+                                onClick = { viewModel.downloadLanguageModel(sourceLang) },
+                                enabled = !isSourceDownloading,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                if (isSourceDownloading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Text("Download", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!isTargetDownloaded && targetLang != sourceLang) {
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f))) {
+                        Row(
+                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "${languages.find { it.first == targetLang }?.second} model is required for offline translation.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Button(
+                                onClick = { viewModel.downloadLanguageModel(targetLang) },
+                                enabled = !isTargetDownloading,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                if (isTargetDownloading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Text("Download", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
+            // Enter text input field
             OutlinedTextField(
                 value = textToTranslate,
                 onValueChange = { 
                     textToTranslate = it
                     viewModel.identifyLanguage(it)
                 },
-                label = { Text("Enter text") },
+                label = { Text("Enter text to translate") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3
+                minLines = 4
             )
 
             if (identifiedLanguage.isNotEmpty()) {
@@ -113,35 +306,34 @@ fun TranslatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 }
             }
 
+            // Translate action button
             Button(
                 onClick = {
-                    if (direction == "EnToBn") {
-                        viewModel.translateEnToBn(textToTranslate) { translatedText = it }
-                    } else {
-                        viewModel.translateBnToEn(textToTranslate) { translatedText = it }
-                    }
+                    viewModel.translateText(textToTranslate, sourceLang, targetLang) { translatedText = it }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = isReady && textToTranslate.isNotBlank()
+                enabled = isSourceDownloaded && isTargetDownloaded && textToTranslate.isNotBlank()
             ) {
-                Text("Translate")
+                Text("Translate Offline")
             }
 
+            // Results Card
             if (translatedText.isNotEmpty()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Translation:", style = MaterialTheme.typography.titleSmall)
+                        Text("Translation:", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(translatedText, style = MaterialTheme.typography.bodyLarge)
+                        Text(translatedText, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Informational Box about Language Identification
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxWidth()
@@ -162,7 +354,7 @@ fun TranslatorScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "ML Kit can identify over 100 languages offline. Tap below to see the complete list of supported languages and scripts.",
+                        "ML Kit can identify over 100 languages offline. Selected translation languages are downloaded on-demand and kept securely on your device for absolute privacy.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(12.dp))

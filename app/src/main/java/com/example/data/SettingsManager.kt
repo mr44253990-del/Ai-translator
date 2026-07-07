@@ -3,6 +3,7 @@ package com.example.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -17,6 +18,8 @@ class SettingsManager(private val context: Context) {
         val TTS_SPEED = floatPreferencesKey("tts_speed")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
         val TTS_VOICE = stringPreferencesKey("tts_voice")
+        val FIRST_LAUNCH = booleanPreferencesKey("first_launch")
+        val APP_THEME = stringPreferencesKey("app_theme")
     }
 
     val ttsSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
@@ -29,6 +32,14 @@ class SettingsManager(private val context: Context) {
 
     val ttsVoiceFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[TTS_VOICE] ?: ""
+    }
+
+    val firstLaunchFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[FIRST_LAUNCH] ?: true
+    }
+
+    val appThemeFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[APP_THEME] ?: "violet"
     }
 
     suspend fun saveTtsSpeed(speed: Float) {
@@ -46,6 +57,18 @@ class SettingsManager(private val context: Context) {
     suspend fun saveTtsVoice(voiceName: String) {
         context.dataStore.edit { preferences ->
             preferences[TTS_VOICE] = voiceName
+        }
+    }
+
+    suspend fun saveFirstLaunch(firstLaunch: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FIRST_LAUNCH] = firstLaunch
+        }
+    }
+
+    suspend fun saveAppTheme(themeName: String) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_THEME] = themeName
         }
     }
 }

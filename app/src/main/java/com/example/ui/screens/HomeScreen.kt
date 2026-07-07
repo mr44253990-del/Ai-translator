@@ -28,17 +28,21 @@ fun HomeScreen(
     onNavigateToTranslate: () -> Unit,
     onNavigateToAi: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToFeedback: () -> Unit
+    onNavigateToFeedback: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI Tools", fontWeight = FontWeight.Bold) },
+                title = { Text("Offline AI Translator", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = onNavigateToFeedback) {
                         Icon(Icons.Default.Feedback, contentDescription = "Feedback")
                     }
